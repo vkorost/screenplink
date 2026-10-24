@@ -8,6 +8,11 @@ plays the shot. Targets fall, scores count, the gun's magazine runs dry.
 
 Full source code included with the build. Free, offline, no account, no ads. Version 1.0 works on Windows only. Feel free to clone and make it work for Mac if you feel like it.
 
+It is an ideal addition to a man cave, and it works anywhere you have the
+hardware and can control the lighting: a games room, a basement, a bar. The
+lighting is the real constraint rather than the space. You are not asked to sit
+in the dark, but a room you can dim is a room this works better in.
+
 > 🎬 **Short trailer to understand what it is** - *(link coming)*
 > 🔬 **Recap of how it actually works** - *(link coming)*
 
@@ -21,7 +26,9 @@ Full source code included with the build. Free, offline, no account, no ads. Ver
 - **Fifteen figures** with scoring rings printed on them, and a fall for each.
 - **A seventeen-round magazine.** Every shot spends a round, hit or miss. Fire on
   empty and you get a click instead of a bang.
-- **Two players on one screen**, left and right, scored separately.
+- **Two players on one screen**, left and right, scored separately, each with
+  their own magazine and their own score. Play someone else, or take both halves
+  yourself with a pistol in each hand and work your weak side.
 - **Shoot the menu.** The menu is targets too, so you never need the keyboard.
 - **It sets itself up without you firing a shot.** It photographs its own markers
   on the screen to learn where the screen is and which pixel is which, so
@@ -135,6 +142,10 @@ own terms rather than with mine.
 | **Sound effects** | From [Pixabay](https://pixabay.com/sound-effects/) |
 | **Images** | The startup screen, the fifteen target figures and their falls, the menu tiles and the magazine round were all generated with **Google Gemini** |
 | **Spoken lines** | Generated with [ElevenLabs](https://elevenlabs.io): twenty-two lines in three voices |
+
+The packaged release also bundles third-party libraries, two of them under the
+LGPL. They are listed with their sources in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## Safety
 

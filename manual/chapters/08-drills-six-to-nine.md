@@ -3,7 +3,9 @@
 Four drills share one cast of fifteen hand-drawn figures. They differ in what the
 figure does, not in how it is scored.
 
-![One of the fifteen. The scoring rings are printed in the drawing itself.](media/thug04.jpg){width=2.7in}
+![One of the fifteen. The scoring rings are printed in the drawing itself.](../media/thug04.jpg)
+
+*One of the fifteen. The scoring rings are printed in the drawing itself.*
 
 ## What they all have in common
 
@@ -38,7 +40,9 @@ next one starts from zero.
 
 ## 6 - Pop-Up Target
 
-![Two different figures, revealed at the same instant, one per side.](media/mode6.jpg){width=6.9in}
+![Two different figures, revealed at the same instant, one per side.](../media/mode6.jpg)
+
+*Two different figures, revealed at the same instant, one per side.*
 
 The reaction drill with a figure as the target: a blank screen, an unpredictable
 wait, then a figure at an unpredictable place and an unpredictable size, which
@@ -49,7 +53,9 @@ figures that left unengaged.
 
 ## 7 - Static Target
 
-![One figure, held, with its running total beside it.](media/mode7.jpg){width=6.9in}
+![One figure, held, with its running total beside it.](../media/mode7.jpg)
+
+*One figure, held, with its running total beside it.*
 
 One figure, standing, until you drop it. The counter beside it shows the running
 total rather than the value of the last hit -- *"I want you to flash the total
@@ -61,7 +67,9 @@ long the string took.
 
 ## 8 - Moving Target
 
-![On the right, a figure holding at a distance. On the left, one that has just been dropped.](media/mode8.jpg){width=6.9in}
+![On the right, a figure holding at a distance. On the left, one that has just been dropped.](../media/mode8.jpg)
+
+*On the right, a figure holding at a distance. On the left, one that has just been dropped.*
 
 A figure walks toward you, holds, and retreats, drifting sideways as it goes.
 **The size is the distance**: it grows as it approaches and shrinks as it goes
@@ -81,7 +89,9 @@ the same fix was applied to them.
 
 ## 9 - Animated Target
 
-![The filmed soldier, and the hit counter above him.](media/mode9.jpg){width=6.9in}
+![The filmed soldier, and the hit counter above him.](../media/mode9.jpg)
+
+*The filmed soldier, and the hit counter above him.*
 
 A filmed figure, ten seconds of it, moving continuously -- aiming, firing,
 crouching and rising. There are no rings printed on him, so he is scored the only

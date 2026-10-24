@@ -1,6 +1,8 @@
 # The Magazine: Seventeen Rounds
 
-![A full magazine on both sides, drawn one bullet per round. The numeral sits at the fixed end.](media/mode4.jpg){width=6.9in}
+![A full magazine on both sides, drawn one bullet per round. The numeral sits at the fixed end.](../media/mode4.jpg)
+
+*A full magazine on both sides, drawn one bullet per round. The numeral sits at the fixed end.*
 
 A round of ScreenPlink is one magazine. The default is **seventeen**, because
 that is what a CZ Shadow holds, and the point of the whole design is to train the

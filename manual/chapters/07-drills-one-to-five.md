@@ -2,7 +2,9 @@
 
 ## 1 - Static Targets
 
-![A big target in the middle, four small ones in the corners, and the rings that score.](media/mode1.jpg){width=6.9in}
+![A big target in the middle, four small ones in the corners, and the rings that score.](../media/mode1.jpg)
+
+*A big target in the middle, four small ones in the corners, and the rings that score.*
 
 A large ringed target in the middle and four small aim marks in the corners.
 Nothing moves, nothing escalates and nothing disappears: you shoot, holes appear,
@@ -19,7 +21,9 @@ screen without turning on any readouts.
 
 ## 2 - Escalating Ball
 
-![One ball, and the level it has reached. Each side escalates on its own.](media/mode2.jpg){width=6.9in}
+![One ball, and the level it has reached. Each side escalates on its own.](../media/mode2.jpg)
+
+*One ball, and the level it has reached. Each side escalates on its own.*
 
 One ball bounces around. Every time you hit it, it comes back five per cent
 faster, up to level five and no further. Hitting a level-four ball is worth four
@@ -44,7 +48,9 @@ punishes it already.
 
 ## 3 - Bouncing Balls
 
-![Several balls, each carrying its own level.](media/mode3.jpg){width=6.9in}
+![Several balls, each carrying its own level.](../media/mode3.jpg)
+
+*Several balls, each carrying its own level.*
 
 Several balls at once, and **each one carries its own level**, printed on it.
 Hitting the easy one does not punish you on the hard one, so after a few minutes
@@ -65,7 +71,9 @@ typical shot from 85 down to 30. The target was hiding the shots that hit it.
 
 ## 4 - Reaction
 
-![One target, revealed without warning. In two-player mode both sides see it at the same instant.](media/mode4.jpg){width=6.9in}
+![One target, revealed without warning. In two-player mode both sides see it at the same instant.](../media/mode4.jpg)
+
+*One target, revealed without warning. In two-player mode both sides see it at the same instant.*
 
 A blank screen, a wait of unpredictable length, and then one target. The clock
 starts the instant it is drawn and stops when you hit it.
@@ -85,7 +93,9 @@ single lucky repetition is not a skill.
 
 ## 5 - Clear The Board
 
-![Twelve circles, one clock.](media/mode5.jpg){width=6.9in}
+![Twelve circles, one clock.](../media/mode5.jpg)
+
+*Twelve circles, one clock.*
 
 Twelve targets, one clock, hit them all. It reports the time and the number of
 rounds it took.

@@ -1,6 +1,8 @@
 # The Menu, and Moving Between Drills
 
-![The Main Menu. Two player-count tiles, nine drills, and Exit.](media/main_menu.jpg){width=6.9in}
+![The Main Menu. Two player-count tiles, nine drills, and Exit.](../media/main_menu.jpg)
+
+*The Main Menu. Two player-count tiles, nine drills, and Exit.*
 
 Press **M** for the menu at any time. Every tile can be shot, clicked with the
 mouse, or started by pressing the key printed in its corner.

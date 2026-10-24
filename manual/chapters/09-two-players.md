@@ -4,7 +4,9 @@ Press **T**, or shoot the Two Players tile. The screen splits down the middle an
 two people shoot at once, one per side, at the same drill. **O** puts it back to
 one. Every drill in the app runs two-player.
 
-![Two players, one drill, one magazine each.](media/mode3.jpg){width=6.9in}
+![Two players, one drill, one magazine each.](../media/mode3.jpg)
+
+*Two players, one drill, one magazine each.*
 
 ## Why the split is left and right
 

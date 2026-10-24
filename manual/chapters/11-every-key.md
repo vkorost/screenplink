@@ -2,7 +2,9 @@
 
 Press **K** at any time and the app shows this screen itself.
 
-![The Keyboard Shortcuts screen, as the app draws it.](media/keyboard-shortcuts.jpg){width=6.2in}
+![The Keyboard Shortcuts screen, as the app draws it.](../media/keyboard-shortcuts.jpg)
+
+*The Keyboard Shortcuts screen, as the app draws it.*
 
 The drill rows on that screen are read from the app's own list of drills, using
 each drill's own name, so a drill added in a later version appears there by

@@ -65,7 +65,7 @@ that lets it query the running app directly for what the camera is seeing and
 what the detector measured. Opening the folder in Claude Code and asking it to
 set the app up is the fastest route through a difficult camera.
 
-Three diagnoses that are almost never what they look like:
+Four diagnoses that are almost never what they look like:
 
 - **Shots register when you stand square to the screen and stop registering when
   you move to one side.** That is the screen, not the app. A glossy or
@@ -76,3 +76,10 @@ Three diagnoses that are almost never what they look like:
 - **A weak signal is not a reason to darken the room.** A dark room is the best
   condition this app can have. The cures are a longer exposure (**X**), a camera
   closer to the screen, or a shorter range.
+- **No sound at all**, while the log says the gunshot played. Open the Windows
+  volume mixer **with the app running** -- it lists a program only while that
+  program is open, which is why this one is so easy to miss -- and look at
+  ScreenPlink's own slider. Windows keeps a separate volume for every
+  application on every output device, so a fresh install arrives with a fresh
+  slider, and one sitting at the bottom is indistinguishable from an app whose
+  sound is broken. Three days went into finding that the first time.

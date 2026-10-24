@@ -5,7 +5,9 @@ shows targets. An ordinary USB webcam watches the screen. When you fire a laser
 trainer pistol at it, the app works out which pixel the dot landed on, draws a
 bullet hole there and plays a shot.
 
-![Static Targets, in two-player mode. Each side has its own magazine, its own round counter and its own score.](media/mode1.jpg){width=6.9in}
+![Static Targets, in two-player mode. Each side has its own magazine, its own round counter and its own score.](../media/mode1.jpg)
+
+*Static Targets, in two-player mode. Each side has its own magazine, its own round counter and its own score.*
 
 There is no projector, no special screen and no sensor bar. The camera does not
 have to sit in front of the monitor: off to one side at an angle is normal and

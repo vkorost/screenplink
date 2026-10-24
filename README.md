@@ -73,9 +73,7 @@ panel may scatter the dot differently, and you may meet something I never did.
 
 That is what [TROUBLESHOOTING.md](TROUBLESHOOTING.md) is for. It is written from
 the faults this hardware actually produced, and it lists the numbers a healthy
-setup gives, so you can tell how far yours is from working. If you hit something
-that is not in it, open an issue. A second rig is worth more to this project than
-any feature.
+setup gives, so you can tell how far yours is from working.
 
 ## Get it
 

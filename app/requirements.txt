@@ -1,0 +1,15 @@
+# Laser Shooting App - direct dependencies (Python 3.13, Windows)
+# Exact resolved versions of the whole tree live in requirements.lock.txt
+#
+# NOTE: opencv-python is deliberately held on the 4.x line. 5.0 is out, but 4.x
+# is the API every tutorial, answer and snippet in the wild targets, and we are
+# going to be doing a lot of fiddly CV work. Revisit once things are stable.
+
+numpy==2.2.6
+opencv-python==4.14.0.94
+PySide6==6.12.0
+# pycaw is used only by tools/audio_meter.py (read-only Core Audio queries).
+pycaw==20260927
+pygrabber==0.2
+sounddevice==0.5.6
+soundfile==0.14.0

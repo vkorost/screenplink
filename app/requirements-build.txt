@@ -1,0 +1,3 @@
+# Build-time only. NOT needed to run the app, and deliberately separate from
+# requirements.txt so the shipped bundle never carries the packager.
+pyinstaller==6.16.0

@@ -1,0 +1,94 @@
+{
+ "_note": "What each baked tile measures. `lit_pct_at_sixth` is what ONE tile would spend of a 4K screen at 1/6 of its width, the figure tools/menu_tile.py prints; the menu lays tiles at 1/7, which is smaller, so the real cost is lower. Measured at 1/7 on 2026-10-18 the eleven pictures come to 1.59% of the screen against the 2% budget. Entries under the drills' OLD numbering (5_discriminate, 6_clear, 7_popup, 8_image, 9_advancing, A_animated) were pruned the same day: after the renumbering they named no file on disk and were being read as measurements of tiles that no longer exist.",
+ "1_static": {
+  "ink": 16974,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.3198,
+  "bytes": 34008
+ },
+ "2_ball": {
+  "ink": 17815,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.3356,
+  "bytes": 36737
+ },
+ "3_balls": {
+  "ink": 12686,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.239,
+  "bytes": 28945
+ },
+ "4_reaction": {
+  "ink": 15935,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.3002,
+  "bytes": 22582
+ },
+ "5_clear": {
+  "ink": 21324,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.4017,
+  "bytes": 38980
+ },
+ "6_popup": {
+  "ink": 1347,
+  "peak": 71,
+  "red_excess": 0,
+  "fill_frac": 0.898,
+  "lit_pct_at_sixth": 0.0254
+ },
+ "7_image": {
+  "ink": 1503,
+  "peak": 71,
+  "red_excess": 0,
+  "fill_frac": 0.898,
+  "lit_pct_at_sixth": 0.0283
+ },
+ "8_moving": {
+  "ink": 3269,
+  "peak": 71,
+  "red_excess": 0,
+  "fill_frac": 0.898,
+  "lit_pct_at_sixth": 0.0616
+ },
+ "9_animated": {
+  "ink": 4183,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.0788,
+  "bytes": 14605
+ },
+ "exit": {
+  "ink": 10064,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.1896,
+  "bytes": 26102
+ },
+ "menu": {
+  "ink": 10032,
+  "peak": 71,
+  "red_excess": 0,
+  "fill_frac": 0.428,
+  "lit_pct_at_sixth": 0.189
+ },
+ "single": {
+  "ink": 12280,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.2313,
+  "bytes": 33191
+ },
+ "versus": {
+  "ink": 6164,
+  "peak": 71,
+  "red_excess": 0,
+  "lit_pct_at_sixth": 0.1161,
+  "bytes": 19198
+ }
+}

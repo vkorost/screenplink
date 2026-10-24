@@ -1,0 +1,184 @@
+#!/bin/sh
+# Install with:  tools/install-hooks.ps1   (or copy to .git/hooks/pre-commit)
+# Git runs .git/hooks/pre-commit, NOT this file. tests/test_rules.py section N
+# fails when the two differ, so edit here, then re-run the installer.
+#
+# WHY A HOOK AND NOT A HABIT
+# --------------------------
+# RULES C13 says to run the whole-chain harness before committing. It was
+# written down, and then eight more changes went in without running it once.
+# `RULES.md` D6 says that for a repeated mistake the answer is a structural
+# change and not an assurance of more care; this is that change.
+#
+# What runs, and why in this order -- cheapest first, so a refusal is fast:
+#
+#   1. the executable rules (~1s)   the ones prose could not keep
+#   2. the Director's properties    one run slot, cleanup, deadlines
+#   3. the mutation check           proof those checks can actually FAIL
+#   4. everything else synthetic    ~15s, never touches his screen
+#   5. the cold-start harness       ONLY when the startup chain changed,
+#                                   because it costs minutes
+#   6. the slow mutation checks     ONLY when a file they mutate changed
+#
+# Step 4 used to list eight suites while run_tests.bat ran twenty-odd, so the
+# figure drills, the artwork, the introspection server and the replay tool
+# could be committed without one of their own checks running (RULES C7: a
+# check that is never executed is not a check). It now runs every suite in
+# run_tests.bat except the two that are earned by touching their area, and
+# both are named in this header: test_coldstart (step 5, minutes) and
+# test_introspect (a wall-clock bar, see the end of this file). The four
+# mutation scripts are steps 3 and 6. tests/test_rules.py section O fails the
+# build if run_tests.bat gains a suite this hook lacks, so this sentence
+# cannot quietly become false again.
+#
+# Step 6 is the same decision as step 5, for the same reason. The three slow
+# mutation scripts cost 73s (detector), 273s (figures) and 65s (introspect).
+# Seven minutes on every commit would teach us to type --no-verify, and this
+# project's own conclusion is that fast suites are the ones that get run. So
+# each runs only when a file it MUTATES (or the script/suite itself) is
+# staged. The patterns are read off the scripts' own target lists, not
+# guessed; if a mutation script gains a target in a new file, add it here
+# (NOTHING checks this yet: no test compares these patterns with the scripts'
+# target lists, so drift is silent -- a gap, not a guarantee).
+#
+# Measured, so the cost is never argued from feel: the synthetic suite is
+# about twelve seconds and opens no camera and no window. One live gate
+# launch is about seventy seconds of his monitor. The whole point is to
+# spend more of the first kind so less of the second is needed.
+#
+# To commit without this, deliberately:  git commit --no-verify
+# If you find yourself typing that, the honest move is to fix the check or
+# change the rule -- not to route around it.
+
+set -e
+# The repository root holds app/ and resources/; the venv, tests/ and tools/ are in
+# app/. Run from there, and give the file patterns below the app-relative names they
+# were written against (anything outside app/, such as resources/targets/, keeps its
+# repository-relative name, which is what the 'targets/' pattern matches).
+cd "$(git rev-parse --show-toplevel)/app"
+
+PY=".venv/Scripts/python.exe"
+if [ ! -x "$PY" ]; then
+    PY="python"
+fi
+
+export QT_QPA_PLATFORM=offscreen
+
+say() { printf '\n[pre-commit] %s\n' "$1"; }
+fail() {
+    printf '\n[pre-commit] REFUSED: %s\n' "$1"
+    printf '[pre-commit] Fix it, or `git commit --no-verify` if you mean to.\n'
+    exit 1
+}
+
+STAGED=$(git diff --cached --name-only | sed 's#^app/##')
+
+# ---- 1. the rules, executing ------------------------------------------
+say "the rules that can execute"
+"$PY" tests/test_rules.py >/dev/null 2>&1 || {
+    "$PY" tests/test_rules.py || true
+    fail "a rule from RULES.md is being broken"
+}
+
+# ---- 2+3. the Director and the proof its checks can fail --------------
+say "the Director, and that its checks can fail"
+"$PY" tests/test_director.py >/dev/null 2>&1 || {
+    "$PY" tests/test_director.py || true
+    fail "the Director no longer holds its properties"
+}
+"$PY" tests/mutate_director.py >/dev/null 2>&1 || {
+    "$PY" tests/mutate_director.py || true
+    fail "a fault was reintroduced and NOT caught -- a green suite that "\
+"cannot fail is worse than no suite"
+}
+
+# ---- 4. the rest of the synthetic suite -------------------------------
+say "the synthetic suite (no camera, no screen)"
+for t in test_detector test_ui_smoke test_modes test_align test_feedback          test_exposure test_selfcheck test_pattern_cal test_routines          test_artwork test_ceiling test_figures test_replay          test_playarea test_silent_audio test_shotreader          test_splash test_watchdog test_screenwatch test_voice test_volume_fall          test_menu test_mcp test_doctor test_ghost test_audio_own; do
+    "$PY" "tests/$t.py" >/dev/null 2>&1 || {
+        "$PY" "tests/$t.py" || true
+        fail "tests/$t.py"
+    }
+done
+
+# ---- 5. the whole chain, only when the chain changed ------------------
+#
+# Unit tests pass while the app is broken, because this app is a set of
+# routines sharing one screen, one camera and one detector, and every fault
+# worth finding lives in the interaction. Seven regressions in one day were
+# each correct in isolation.
+NEEDS_CHAIN=$(printf '%s\n' "$STAGED" | grep -E \
+    'src/lsa/(director|routines)\.py|src/lsa/tools/camera_lab\.py|src/lsa/camera/|src/lsa/calibrate/|tests/(fake_camera|test_coldstart)\.py' \
+    || true)
+
+if [ -n "$NEEDS_CHAIN" ]; then
+    say "the startup chain changed, so running the cold-start harness."
+    say "This takes several minutes and needs no monitor. Leave it."
+    "$PY" tests/test_coldstart.py || \
+        fail "the whole-chain harness -- this is the one that finds the races"
+else
+    say "startup chain untouched; skipping the cold-start harness"
+fi
+
+# ---- 6. the slow mutation checks, only when their area changed ---------
+#
+# Each pattern below is the set of files that script's mutation list edits,
+# plus the script itself and the fixture they share. Running a mutation
+# script costs more than the suite it guards, so it is earned by touching
+# what it guards.
+run_mutation() {   # $1 = script, $2 = grep pattern, $3 = what it guards
+    if printf '%s\n' "$STAGED" | grep -qE "$2"; then
+        say "$3 changed, so proving its checks can fail ($1)"
+        "$PY" "tests/$1" >/dev/null 2>&1 || {
+            "$PY" "tests/$1" || true
+            fail "a fault was reintroduced in $3 and NOT caught (tests/$1)"
+        }
+    else
+        say "$3 untouched; skipping tests/$1"
+    fi
+}
+
+run_mutation mutate_detector.py \
+    'src/lsa/(detect/|exposure\.py|routines\.py|shotlog\.py|camera/(capture|evidence)\.py|display/layers\.py|introspect/view\.py|modes/advancing\.py|tools/camera_lab\.py)|tools/replay\.py|tests/(mutate_detector|fake_camera|test_detector|test_exposure|test_routines|test_replay)\.py' \
+    "the detector, exposure or shot-log path"
+run_mutation mutate_ghost.py \
+    'src/lsa/ghost\.py|src/lsa/scorecard\.py|src/lsa/bests\.py|tests/(mutate_ghost|test_ghost)\.py' \
+    "the ghost score or its phantom guard"
+run_mutation mutate_audio.py \
+    'src/lsa/audio/|src/lsa/tools/camera_lab\.py|tests/(mutate_audio|test_audio_own|audio_paths|silent_audio)\.py' \
+    "listening through our own bang, or the one path to the room"
+run_mutation mutate_figures.py \
+    'src/lsa/(artwork/|modes/(figure|advancing|image_target|popup)\.py|display/(layers|window)\.py|tools/camera_lab\.py)|targets/|tests/(mutate_figures|test_artwork|test_figures)\.py' \
+    "the figure drills or their artwork"
+run_mutation mutate_introspect.py \
+    'src/lsa/(introspect/|tools/camera_lab\.py)|tests/(mutate_introspect|test_introspect)\.py' \
+    "the introspection server"
+
+# tests/test_introspect.py carries a WALL-CLOCK bar (section 11: what the
+# server costs the capture loop against the detector's ~14 ms cliff). On
+# 2026-10-17 a commit was refused at 40-44 s launches that measure 38-39 s on
+# a quiet machine, purely from CPU contention, and a bar that can be waved
+# through when the machine is busy is not a bar -- while one that fires on an
+# unrelated commit teaches us to type --no-verify. So it is earned by touching
+# the instrument, like the slow mutation checks above, and is not run on every
+# commit. camera_lab.py is in the trigger on purpose: section 12 asserts every
+# CameraLab attribute view.py reads still exists, and a rename in camera_lab.py
+# would otherwise leave an endpoint reporting its DEFAULT -- /state would say
+# "the noise floor was never measured" about an app that had measured it. That
+# is a producer/consumer seam, and an untested seam has bitten this project
+# three times in a week. The cheaper alternative to this (splitting section 11
+# from 12 so only the timing is conditional) has not been done.
+if printf '%s\n' "$STAGED" | grep -qE \
+    'src/lsa/(introspect/|tools/camera_lab\.py)|tests/(mutate_introspect|test_introspect)\.py'; then
+    say "the introspection server changed, so running its suite (timing bar)"
+    "$PY" tests/test_introspect.py >/dev/null 2>&1 || {
+        "$PY" tests/test_introspect.py || true
+        fail "tests/test_introspect.py (its cost bar is wall-clock: re-run "\
+"on a quiet machine before concluding it is a real regression)"
+    }
+else
+    say "introspection server untouched; skipping tests/test_introspect.py"
+fi
+
+say "all green"
+exit 0

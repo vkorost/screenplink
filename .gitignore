@@ -1,0 +1,28 @@
+# Derived, disposable, or personal to one machine. Nothing here is needed by
+# anyone who clones this repo or contributes to it.
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Test and build output
+app/tests/_out/
+build/
+dist/
+*.spec
+
+# Runtime state, written by the app on the machine it runs on
+app/logs/
+app/recordings/
+app/cache/
+app/reports/
+
+# Written by Doctor.cmd beside itself when it runs from source
+doctor-report.txt
+
+# Measured on ONE camera in ONE room. A fresh install measures its own; a
+# borrowed calibration is worse than none, and `packaging/assemble.py`
+# refuses to put either of these in a release.
+app/config/settings.local.json
+app/config/calibration.json

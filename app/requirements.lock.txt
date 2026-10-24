@@ -1,0 +1,17 @@
+cffi==2.1.1
+comtypes==1.4.17
+numpy==2.2.6
+opencv-python==4.14.0.94
+psutil==7.2.2
+pycaw==20260927
+pycparser==3.11
+pygrabber==0.2
+PySide6==6.12.0
+PySide6_Addons==6.12.0
+PySide6_Essentials==6.12.0
+PySide6_Pdf==6.12.0.140
+PySide6_WebEngine==6.12.0.140
+shiboken6==6.12.0
+sounddevice==0.5.6
+soundfile==0.14.0
+typing_extensions==4.16.0

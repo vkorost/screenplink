@@ -38,9 +38,9 @@ In Q4 2026 I went looking for a free game that would let me shoot moving targets
 on my own computer monitor with my laser trainer pistols. I did not find anything
 quite like that.
 
-So I read up on the dry-fire laser landscape, and worked out that it ought to be
-possible, provided the monitor is matte and the camera does at least 60 frames
-per second. Then I built the game I wanted, to my own taste and my own
+So I [read up on the dry-fire laser landscape][book], and worked out that it
+ought to be possible, provided the monitor is matte and the camera does at least
+60 frames per second. Then I built the game I wanted, to my own taste and my own
 requirements.
 
 I am sharing it in case a few other people find it useful.
@@ -110,7 +110,7 @@ placement can follow.
 | 📖 **[User Guide](manual/README.md)** | Thirteen chapters: the screen it needs, setup, the nine drills, the magazine, the score, two players and every key. PDF and EPUB included |
 | 🔧 **[Troubleshooting](TROUBLESHOOTING.md)** | When the app does not work. Start at the top: the most common fault is not in this app at all |
 | 🗺️ **[Project layout](PROJECT-LAYOUT.md)** | Every folder, for anyone changing the code |
-| 📕 **[Laser Training for Home Shooters](https://github.com/vkorost/laser-dry-fire-field-guide)** | A Q4 2026 book on the laser dry-fire category: the apps, the targets, the sensors, the scoring and the failure modes. Built from a few AI deep-research reports over vendor documentation and owner reports, with nothing in it bought or borrowed. It is not about this project. It is a survey of dry laser shooting that I built for myself, to understand the landscape and to check whether what I was about to build already existed in some shape or form |
+| 📕 **[Laser Training for Home Shooters][book]** | A Q4 2026 book on the laser dry-fire category: the apps, the targets, the sensors, the scoring and the failure modes. Built from a few AI deep-research reports over vendor documentation and owner reports, with nothing in it bought or borrowed. It is not about this project. It is a survey of dry laser shooting that I built for myself, to understand the landscape and to check whether what I was about to build already existed in some shape or form |
 
 ## Safety
 
@@ -124,3 +124,5 @@ but do not look into the muzzle.
 <p align="center">
   <img src="resources/images/StartupScreen-v01.jpg" alt="ScreenPlink: turn your monitor into a laser dry-fire range" width="820">
 </p>
+
+[book]: https://github.com/vkorost/laser-dry-fire-field-guide

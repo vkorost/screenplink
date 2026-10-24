@@ -51,6 +51,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 sys.path.insert(0, str(ROOT / "tools"))
+sys.path.insert(0, str(ROOT / "tests"))   # asset_env: the asset table, by path
+import asset_env as _ae                   # noqa: E402
 import suites_for as sf                                    # noqa: E402
 
 # suites_for rebuilds the whole import graph on every call (seconds each). The
@@ -106,8 +108,17 @@ NOT_CODE = (".md", ".txt", ".log", ".png", ".jpg", ".jpeg", ".gif", ".mp3", ".wa
             ".json", ".cache", ".ps1", ".cmd", ".bat", ".txt", ".pyc")
 NOT_CODE_DIRS = ("config/", "logs/", "cache/", "reports/",
                  "agent_reports/", "calib_backups/", "recordings/")
-ASSET_DIRS = ("targets/", "animations/", "menu/", "voice/", "sounds/",
-              "images/")
+# DERIVED, never typed. These names live in `lsa/artwork/assets.py`, and a
+# second copy here is the fault that has broken this project three times in
+# five days: a folder moves, one table follows and the other does not.
+# `asset_env` loads that module BY PATH, so the planner still never imports
+# `lsa` (which would pull in OpenCV).
+#
+# Both layouts are accepted: the artwork now sits under `resources/`, and a
+# path naming the bare folder is what the old tree produced.
+ASSET_NAMES = tuple(n.rstrip("/") for n in _ae.ASSET_DIRS)
+ASSET_DIRS = (tuple(f"{_ae.ASSET_PARENT}/{n}/" for n in ASSET_NAMES)
+              + tuple(n + "/" for n in ASSET_NAMES))
 
 
 # -- helpers -----------------------------------------------------------------
@@ -208,7 +219,10 @@ def classify(path: str):
         return suites, m, ("" if suites or m else "a dev tool no suite mentions")
 
     if p.startswith(ASSET_DIRS):
-        top = p.split("/")[0] + "/"
+        # `resources/sounds/x.mp3` belongs to `sounds/`, not to `resources/`:
+        # the suites name the asset folder, which is what is searched for.
+        _parts = p.split("/")
+        top = next((x for x in _parts if x in ASSET_NAMES), _parts[0]) + "/"
         suites |= _suites_mentioning_folder(top)
         m = [(Path(x).name, w) for x, w in sf.suites_for([p])[1]]
         return suites, m, ("" if suites else "an asset folder no suite names")
@@ -248,16 +262,38 @@ def _git(args):
     return done.stdout
 
 
+def _git_prefix() -> str:
+    """How git names the paths that live in THIS folder.
+
+    `git diff --name-only` answers from the REPOSITORY root, and the app is a
+    subfolder of its repository (`app/`), so a changed file arrives as
+    `app/src/lsa/foo.py` while everything here counts from `app/`. Joining the
+    two gave `app/app/src/...`: every lookup missed and the planner reported
+    "nothing imports what changed" for a file that plainly had -- silently, and
+    in the one tool whose whole job is to say which suites to run.
+
+    Empty when the app IS the repository root, which is how the old tree was.
+    """
+    return _git(["rev-parse", "--show-prefix"]).strip().replace("\\", "/")
+
+
+def _here(raw: str) -> str:
+    """One git path, re-expressed against this app's root."""
+    q = raw.replace("\\", "/")
+    pre = _git_prefix()
+    return q[len(pre):] if pre and q.startswith(pre) else q
+
+
 def changed_paths(mode: str):
     """(paths, lines_changed). Working-tree and staged both measured by git."""
     if mode == "staged":
-        paths = [x for x in _git(["diff", "--cached", "--name-only"]).splitlines() if x]
+        paths = [_here(x) for x in _git(["diff", "--cached", "--name-only"]).splitlines() if x]
         stat = _git(["diff", "--cached", "--shortstat"])
     else:
         paths = []
         for line in _git(["status", "--porcelain", "-uall"]).splitlines():
             if len(line) > 3:
-                paths.append(line[3:].split(" -> ")[-1].strip().strip('"'))
+                paths.append(_here(line[3:].split(" -> ")[-1].strip().strip('"')))
         stat = _git(["diff", "HEAD", "--shortstat"])
         # tests/ is gitignored here, so git cannot see a change to a suite.
         # Judge it by modification time against the HEAD commit instead, and

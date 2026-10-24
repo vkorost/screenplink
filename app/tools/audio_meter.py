@@ -242,8 +242,16 @@ def rank_findings(findings: "list[str]") -> "list[str]":
 
 
 def is_ours(exe: str) -> bool:
-    """python, pythonw, or anything under this project."""
-    return bool(re.search(r"python|laser\.shooting", exe or "", re.I))
+    """python, pythonw, the packaged exe, or anything under this project.
+
+    `screenplink` is here because the pattern only knew the OLD project folder
+    (`laser.shooting`), so a PACKAGED install -- screenplink.exe, which is what
+    a stranger runs -- would not have been recognised as ours. This is the tool
+    that found the silent gunshot he reported for three days: python.exe sitting
+    at volume 0.0 on the monitor endpoint. Blind to the frozen build, it would
+    have found nothing for the one person who cannot read the registry himself.
+    """
+    return bool(re.search(r"python|laser\.shooting|screenplink", exe or "", re.I))
 
 
 # ---------------------------------------------------------------------------

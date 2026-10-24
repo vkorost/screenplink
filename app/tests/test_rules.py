@@ -28,11 +28,15 @@ from __future__ import annotations
 
 import safe_stdio  # noqa: F401  -- a suite's own printer must not crash it
 
+import author_files as _af  # one place resolves the files he keeps private
+import owned_files as _of  # the keys the isolation deliberately rewrites
+
 import ast
 import io
 import os
 import re
 import sys
+import tokenize
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +59,59 @@ def check(ok: bool, what: str, detail: str = "") -> None:
 
 def section(n: str) -> None:
     print(f"\n=== {n} ===")
+
+
+NOT_RUN: list[str] = []
+
+
+def code_only(path: Path) -> str:
+    """A file with its COMMENTARY removed, so a note recording that something
+    was deleted is not read as evidence that it came back.
+
+    Written 2026-10-23 because the `ui/`-is-gone scan below reported two hits
+    and BOTH WERE PROSE: a docstring line in `artwork/ui.py` saying the folder
+    and its override were removed, and the comment above the check itself. A
+    plain text scan cannot tell a live override from its own obituary, and a
+    check that fires on its own documentation is one somebody edits into
+    silence. Five hollow checks on this project started that way.
+
+    Single-quoted strings are KEPT, deliberately: `os.environ["LSA_UI"]` is a
+    live read and must still be caught. Only comments and triple-quoted blocks
+    go. An unparseable file is scanned WHOLE rather than skipped -- a scan that
+    quietly covers less than it claims is the very fault this guards against.
+    """
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if path.suffix != ".py":
+        return "\n".join(
+            ln for ln in text.splitlines()
+            if not ln.lstrip().lower().startswith(("#", "rem ", "::")))
+    kept = []
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT:
+                continue
+            if (tok.type == tokenize.STRING
+                    and tok.string.lstrip("rbfuRBFU")[:3] in ('"""', "'''")):
+                continue
+            kept.append(tok.string)
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return text
+    return "\n".join(kept)
+
+
+def author_file(rel: str, env: str) -> Path | None:
+    """This suite's half of `tests/author_files.py`: resolve, or report.
+
+    The resolver decides nothing about verdicts, so the reporting lives here --
+    a wrong pointer is a FAILURE, an absent file is a VISIBLE skip, and neither
+    can quietly become a pass.
+    """
+    found, failure, skip = _af.author_file(ROOT, env)
+    if failure:
+        check(False, f"{env} names a file that exists", failure)
+    elif skip:
+        NOT_RUN.append(f"{rel} -- {skip}")
+    return found
 
 
 def py_files(*under: str) -> list[Path]:
@@ -455,11 +512,44 @@ check(len(_paths) == 4 and not _reach,
 _real = ROOT / "config" / "settings.local.json"
 if _paths.get("SETTINGS_PATH") and _real.exists():
     _copy = Path(_paths["SETTINGS_PATH"])
-    check(_copy.exists() and _copy.read_bytes() == _real.read_bytes(),
+    # CONTENT, not bytes. `isolate_outputs()` rewrites the keys named in
+    # `owned_files.NEUTRALISED` and re-serialises the file, so a byte comparison
+    # fails whenever his file is formatted differently from json.dumps -- which
+    # is a check going red for something that is not a fault, and this one did
+    # exactly that on the first run in the new repository. What C15 actually
+    # requires is that his MEASURED values arrive in the copy: the harness must
+    # race against his `calibrate_seconds` and `settle_seconds`, because the
+    # timers around them move when those shorten, and shortened timing
+    # manufactures a pass.
+    _diff: list[str] = []
+    _mine = _them = None
+    if _copy.exists():
+        try:
+            _mine = _json.loads(_copy.read_text(encoding="utf-8"))
+            _them = _json.loads(_real.read_text(encoding="utf-8"))
+        except Exception as exc:                             # noqa: BLE001
+            _diff.append(f"unreadable: {exc!r}")
+    if _mine is not None and _them is not None:
+        _forced = dict(_of.NEUTRALISED)
+        for _k in set(_mine) | set(_them):
+            if _k in _forced:
+                if _mine.get(_k) != _forced[_k]:
+                    _diff.append(f"{_k} should be forced to {_forced[_k]!r}, is {_mine.get(_k)!r}")
+            elif _mine.get(_k, KeyError) != _them.get(_k, KeyError):
+                _diff.append(f"{_k}: copy {_mine.get(_k)!r} vs his {_them.get(_k)!r}")
+    check(_copy.exists() and _mine is not None and not _diff,
           "and the isolated settings are a COPY of his, not an empty file",
-          "RULES C15: a harness that boots from defaults reads a different "
-          "calibrate_seconds and settle_seconds than the bench, and the "
-          "timers that race against them move")
+          f"{_diff[:6]} -- RULES C15: a harness that boots from defaults reads a "
+          f"different calibrate_seconds and settle_seconds than the bench, and "
+          f"the timers that race against them move")
+    # And the two his timers actually race against, by name, so this cannot pass
+    # on a copy that happens to match while carrying none of his measurements.
+    for _timing in ("calibrate_seconds", "settle_seconds"):
+        if isinstance(_them, dict) and _timing in _them:
+            check(isinstance(_mine, dict) and _mine.get(_timing) == _them[_timing],
+                  f"and his {_timing} reached the harness",
+                  f"his {_them.get(_timing)!r} vs the copy's "
+                  f"{(_mine or {}).get(_timing)!r}")
 
 # AND A LAUNCHER MAY NOT DELETE HIS EVIDENCE.
 #
@@ -1036,8 +1126,8 @@ for _p in (_victim, _mp, _sp):
 #
 # Reading the file cannot catch it: forward slashes parse and then fail to
 # launch on Windows instead. So this parses it AND runs the command.
-_hook = ROOT / ".claude" / "settings.json"
-if _hook.exists():
+_hook = author_file("L. .claude/settings.json", "LSA_CLAUDE_SETTINGS")
+if _hook is not None:
     import json as _json
     import subprocess as _sub
     _conf = None
@@ -1053,8 +1143,14 @@ if _hook.exists():
         check(bool(_cmds), "and it defines a SessionStart command")
         for _c in _cmds:
             try:
-                _r = _sub.run(_c, cwd=str(ROOT), shell=True, timeout=90,
-                              capture_output=True, text=True)
+                # Run it where that hook LIVES -- the folder holding .claude --
+                # not wherever this suite was started from. Identical in his
+                # working tree, where they are the same folder; correct when the
+                # settings file is reached through LSA_CLAUDE_SETTINGS, which
+                # would otherwise resolve the hook's own paths against this repo
+                # and fail a hook that is perfectly good.
+                _r = _sub.run(_c, cwd=str(_hook.parent.parent), shell=True,
+                              timeout=90, capture_output=True, text=True)
                 _ok = _r.returncode == 0
                 _has = "BEFORE WRITING CODE" in _r.stdout
             except Exception as exc:                         # noqa: BLE001
@@ -1148,24 +1244,26 @@ REGISTRY: dict[str, str] = {
     "D13": "judgement (every burst of output ends with a short summary of what is going on)",
 }
 
-rules_md = read(ROOT / "RULES.md")
-headings = re.findall(r"^## ([A-Z]\d+b?)\.", rules_md, re.M)
-check(len(headings) >= 40, f"RULES.md still has its rules ({len(headings)})",
-      "if this collapses, the file has been rewritten and lost some")
+_rules_path = author_file("K. RULES.md", "LSA_RULES_MD")
+rules_md = read(_rules_path) if _rules_path is not None else ""
+if _rules_path is not None:
+    headings = re.findall(r"^## ([A-Z]\d+b?)\.", rules_md, re.M)
+    check(len(headings) >= 40, f"RULES.md still has its rules ({len(headings)})",
+          "if this collapses, the file has been rewritten and lost some")
 
-lost = [r for r in REGISTRY if r not in headings]
-check(not lost, "no rule in the registry has vanished from RULES.md",
-      f"{lost} -- a rule may be RETIRED by deleting its registry line in the "
-      f"same change, which is reviewable. Silently losing one is not: six "
-      f"went missing in a single rewrite of that file.")
+    lost = [r for r in REGISTRY if r not in headings]
+    check(not lost, "no rule in the registry has vanished from RULES.md",
+          f"{lost} -- a rule may be RETIRED by deleting its registry line in the "
+          f"same change, which is reviewable. Silently losing one is not: six "
+          f"went missing in a single rewrite of that file.")
 
-unregistered = [h for h in headings if h not in REGISTRY]
-check(not unregistered, "every rule in RULES.md is in the registry",
-      f"{unregistered} -- add it, with the test that enforces it or the word "
-      f"'judgement' if a machine genuinely cannot")
+    unregistered = [h for h in headings if h not in REGISTRY]
+    check(not unregistered, "every rule in RULES.md is in the registry",
+          f"{unregistered} -- add it, with the test that enforces it or the word "
+          f"'judgement' if a machine genuinely cannot")
 
-dupes = [h for h in set(headings) if headings.count(h) > 1]
-check(not dupes, "no rule number is used twice", f"{dupes}")
+    dupes = [h for h in set(headings) if headings.count(h) > 1]
+    check(not dupes, "no rule number is used twice", f"{dupes}")
 
 enforced = [r for r, v in REGISTRY.items() if not v.startswith("judgement")]
 print(f"  {len(enforced)} of {len(REGISTRY)} rules are enforced by a check; "
@@ -1973,6 +2071,33 @@ _bad_runner = [p.name for p in _runners
 check(len(_runners) >= 3 and not _bad_runner,
       "every runner that copies a tree passes the asset overrides from scratch_env(), none spells one out",
       f"{_bad_runner} (runners found: {[p.name for p in _runners]})")
+# 3b. AND IT PASSES THE RIGHT ROOT. `scratch_env(X)` names `X/resources/<folder>`,
+# so the argument decides whether the child reads real artwork, a scratch copy, or
+# nothing at all. `ROOT` is `app/`, and the artwork is BESIDE it -- correct only
+# while the app was its own repository root, which it stopped being on 2026-10-23.
+# Two of five runners still passed ROOT: their children got LSA_SOUNDS pointing at
+# `app/resources/sounds`, which exists nowhere, and mutate_audio reported "his 9mm
+# sample does not exist" for a file sitting safely on disk.
+#
+# The check above could not see it, because it asked whether scratch_env was CALLED
+# and the one below asks what it was called WITH -- the seam, again (RULES C14). The
+# existing proof that scratch_env(d) points into the copy tests the FUNCTION; nothing
+# tested the call.
+_wrong_root = []
+for _rp in _runners:
+    try:
+        _rt = ast.parse(_rp.read_text(encoding="utf-8", errors="replace"))
+    except SyntaxError:
+        continue
+    for _n in ast.walk(_rt):
+        if (isinstance(_n, ast.Call) and isinstance(_n.func, ast.Name)
+                and _n.func.id == "scratch_env" and _n.args
+                and isinstance(_n.args[0], ast.Name) and _n.args[0].id == "ROOT"):
+            _wrong_root.append(f"{_rp.name}:{_n.lineno}")
+check(not _wrong_root,
+      "no runner passes ROOT to scratch_env(): the assets are beside app/, not in it",
+      f"{_wrong_root} -- pass the scratch tree when it holds copies of the artwork, "
+      f"or PROJECT when the child should read the real (read-only) folders")
 # 4. The environment really carries every folder, and does not depend on where the source is.
 _e = _senv(_PROJ)
 check(all(v in _e for v in _AD.values()) and _e["QT_QPA_PLATFORM"] == "offscreen",
@@ -2077,18 +2202,19 @@ try:
           _with.stderr.strip().splitlines()[-1] if _with.stderr.strip() else "")
     check(_without.returncode != 0,
           "...and does NOT without LSA_IMAGES (so this check can fail, and the hazard it guards is real)")
+finally:
+    _shutil.rmtree(_tmp, ignore_errors=True)
+
 # The folded-away ui/ folder must not survive anywhere: not in the table, not on disk, not as an
 # override variable in any source, test or script. (Name assembled so this line is not its own hit.)
 _dead = "LSA_" + "UI"
 _hits = sorted(str(p_.relative_to(ROOT)) for p_ in list(ROOT.rglob("*.py")) + list(ROOT.rglob("*.ps1"))
                + list(ROOT.rglob("*.bat")) + list(ROOT.rglob("*.cmd")) + list(ROOT.rglob("*.spec"))
                if "_out" not in p_.parts and ".venv" not in p_.parts
-               and _dead in p_.read_text(encoding="utf-8", errors="replace"))
+               and _dead in code_only(p_))
 check("ui" not in _AD and not (_PROJ / _AP / "ui").exists() and not _hits,
       "the ui/ asset folder is gone everywhere: not in the table, not on disk, no override named in any file",
       str(_hits))
-finally:
-    _shutil.rmtree(_tmp, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -2399,6 +2525,22 @@ with _tf_u.TemporaryDirectory() as _td_u:
 
 
 # ---------------------------------------------------------------------------
+def _report_not_run() -> None:
+    """Name what did not run, so a skip can never be mistaken for a sweep.
+
+    Deliberately worded with neither "passed" nor "failed" in it: section M
+    reads every print() in every suite and treats any line carrying one of
+    those words beside a count as the suite's own verdict, which the judge in
+    `mutation_verdict` must then be able to parse. This is not a verdict.
+    """
+    if not NOT_RUN:
+        return
+    print(f"\n{len(NOT_RUN)} SECTION(S) DID NOT RUN -- neither green nor red.")
+    print("They read files the author keeps outside this repository:")
+    for _n in NOT_RUN:
+        print("  - " + _n)
+
+
 print(f"\n{'=' * 64}")
 if FAILED:
     print(f"FAILED {len(FAILED)} of {CHECKS} rule checks:")
@@ -2406,5 +2548,7 @@ if FAILED:
         print(f"  - {f}")
     print("\nThese are rules from RULES.md. Fix the code, or change the rule "
           "deliberately -- but not by deleting the check.")
+    _report_not_run()
     sys.exit(1)
 print(f"ALL {CHECKS} RULE CHECKS PASSED")
+_report_not_run()

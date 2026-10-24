@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import safe_stdio  # noqa: F401  -- a suite's own printer must not crash it
 
+import author_files as _af  # one place resolves the files he keeps private
+
 import os
 import re
 import sys
@@ -93,6 +95,8 @@ def make(voice_dir=VOICE, seed=1, mixer=None, enabled=None, mute=None):
 
 
 REAL = VOICE.is_dir()
+
+NOT_RUN: list[str] = []
 
 print("=== 1. the mute covers the WHOLE spoken line, measured from real files ===")
 if REAL:
@@ -407,15 +411,27 @@ a.say("v_camera_moved")
 check(a.say("v_calibrating") is False, "'calibrating' is covered by 'camera moved'")
 
 print("=== 10. the wording and the files agree with the assignment ===")
-md = (ROOT / "requirements" / "phrases_to_generate.md").read_text(encoding="utf-8")
-rows = {}
-for k_, v_ in re.findall(r"\|\s*`(v_\w+)`\s*\|\s*([^|]+?)\s*\|", md):
-    rows.setdefault(k_, v_)       # first table wins: later ones list the old wording
-check(set(rows) == set(SPEC), f"SPEC covers exactly the {len(rows)} lines in requirements/phrases_to_generate.md",
-      f"missing {set(rows) ^ set(SPEC)}")
-check(all(PHRASES.get(k) == rows[k] for k in rows),
-      "the logged wording equals the assignment's wording",
-      str([k for k in rows if PHRASES.get(k) != rows[k]]))
+# The assignment this wording was generated FROM is his document, and it is not
+# in this repository (it lists the lines he asked ElevenLabs for). Where it
+# exists, the check runs exactly as before; where it does not, the skip is
+# PRINTED in the summary rather than assumed. Comparing PHRASES against itself
+# would be worse than not checking: this project has already had a "proof" that
+# imported the patched module and tested the fix against itself.
+_spec_md, _spec_bad, _spec_skip = _af.author_file(ROOT, "LSA_VOICE_SPEC")
+if _spec_bad:
+    check(False, "LSA_VOICE_SPEC names a file that exists", _spec_bad)
+elif _spec_skip:
+    NOT_RUN.append("10. the wording against its assignment -- " + _spec_skip)
+if _spec_md is not None:
+    md = _spec_md.read_text(encoding="utf-8")
+    rows = {}
+    for k_, v_ in re.findall(r"\|\s*`(v_\w+)`\s*\|\s*([^|]+?)\s*\|", md):
+        rows.setdefault(k_, v_)   # first table wins: later ones list the old wording
+    check(set(rows) == set(SPEC), f"SPEC covers exactly the {len(rows)} lines in requirements/phrases_to_generate.md",
+          f"missing {set(rows) ^ set(SPEC)}")
+    check(all(PHRASES.get(k) == rows[k] for k in rows),
+          "the logged wording equals the assignment's wording",
+          str([k for k in rows if PHRASES.get(k) != rows[k]]))
 if REAL:
     for sname in ("announcer", "mobster", "soldier"):
         have = {p.stem for p in (VOICE / sname).glob("*.mp3")}
@@ -488,7 +504,25 @@ m.register("boom", _np.zeros(10, dtype=_np.float32))
 check(m.names() == ["boom"], "Mixer.names() lists gunshots only",
       str(m.names()))
 
+def _report_not_run() -> None:
+    """Name what did not run, so a skip cannot read as a clean sweep.
+
+    Worded with neither "passed" nor "failed" in it: test_rules section M reads
+    every print() in every suite and treats any line carrying one of those words
+    beside a count as that suite's own verdict, which the mutation judge then has
+    to parse. This is not a verdict.
+    """
+    if not NOT_RUN:
+        return
+    print(f"\n{len(NOT_RUN)} CHECK(S) DID NOT RUN -- neither green nor red.")
+    print("They read files the author keeps outside this repository:")
+    for _n in NOT_RUN:
+        print("  - " + _n)
+
+
 if FAILED:
     print(f"\nFAILED {len(FAILED)} of {CHECKS}: {FAILED}")
+    _report_not_run()
     sys.exit(1)
 print(f"\nALL {CHECKS} CHECKS PASSED")
+_report_not_run()

@@ -59,6 +59,32 @@ RED_AS_STORED = {"thug02": 6, "thug01": 8, "thug04": 8, "thug05": 8, "alien01": 
                  "thug06": 10, "axman01": 12, "predator01": 26}
 
 
+def grey_or_report(n: str):
+    """`load_grey` for one figure, or None with a FAILED check if the loader
+    broke its contract of one uint8 channel.
+
+    Every section below indexes `g.shape` as (h, w). A loader returning
+    3-channel BGR therefore raised `too many values to unpack`, which killed
+    this suite before its summary -- and `mutate_figures` then reported that
+    fault as BROKEN, "the suite crashed rather than failing the named check",
+    while the check written for it had in fact gone red fifteen times. The
+    attribution was sound and unreadable, because a suite that dies cannot
+    report. Measured 2026-10-24 by applying the mutation by hand.
+
+    So the contract is tested HERE, once, and a figure that fails it is skipped
+    rather than allowed to raise: the section goes red, names the figure, and
+    the suite still reaches its verdict.
+    """
+    g = load.load_grey(catalog.path_for(n))
+    if getattr(g, "ndim", None) == 2 and getattr(g, "dtype", None) == np.uint8:
+        return g
+    check(f"{n}: one uint8 channel from the loader, so this section can run",
+          False,
+          f"ndim={getattr(g, 'ndim', '?')} dtype={getattr(g, 'dtype', '?')} "
+          f"-- load_grey must return a 2-D uint8 array")
+    return None
+
+
 def main() -> int:
     print("\n1. the artwork is all there, and the loader imports no Qt")
     # NOT A COUNT. This read "len(NAMES) == 12" and would have failed the
@@ -186,7 +212,9 @@ def main() -> int:
     worst_p95 = 0.0
     shifted_best = 0.0
     for n in NAMES:
-        g = load.load_grey(catalog.path_for(n))
+        g = grey_or_report(n)
+        if g is None:
+            continue
         h, w = g.shape
         dist = RG.ink_distance(g, A.ink_level(g))
         info = info_all[n]
@@ -496,5 +524,33 @@ def main() -> int:
     return 1
 
 
+def guarded_main() -> int:
+    """`main()` with a net under it, so a raise costs the checks AFTER it rather
+    than the whole report.
+
+    Why (2026-10-24, the same reason test_ghost grew this on 10-22): mutation
+    faults came back BROKEN -- "the suite crashed rather than failing the named
+    check" -- and measuring one by hand showed the check written for it HAD gone
+    red, fifteen times, before a later section raised. The attribution was sound
+    and unreadable, because a suite that dies prints no summary and the runner
+    refuses, correctly, to read a crash as a catch.
+
+    It does NOT make a crash a catch: the runner still needs a failing line
+    naming the fault's own check, and the crash itself is recorded as a failing
+    check, so the suite is red either way.
+    """
+    try:
+        return main()
+    except Exception as exc:                          # noqa: BLE001 - the finding
+        import traceback
+        check("the suite ran to its end without raising", False,
+              f"{type(exc).__name__}: {exc}")
+        tb = traceback.extract_tb(exc.__traceback__)[-1]
+        print(f"      raised at test_artwork.py line {tb.lineno}: {tb.line}")
+        print()
+        print(f"{checks.count(False)} OF {len(checks)} CHECKS FAILED")
+        return 1
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(guarded_main())

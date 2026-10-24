@@ -186,6 +186,36 @@ def _git(args):
     return [line for line in done.stdout.splitlines() if line.strip()]
 
 
+def _git_prefix() -> str:
+    """How git names the paths that live in THIS folder.
+
+    Git answers `--name-only` from the REPOSITORY root; this app is `app/`
+    inside its repository, and everything here counts from `app/`. Joining the
+    two doubled the prefix, so every lookup missed and the tool reported
+    "nothing imports what changed". Empty when the app IS the repo root.
+    """
+    out = _git(["rev-parse", "--show-prefix"])
+    return out[0].strip().replace("\\", "/") if out else ""
+
+
+def _here(paths):
+    """Git paths re-expressed against this app's root, plus the ones outside it.
+
+    What lies outside `app/` (the manual, the README) is RETURNED SEPARATELY and
+    printed rather than dropped: a tool that quietly covers less than it claims
+    is this project's oldest mistake.
+    """
+    pre = _git_prefix()
+    mine, outside = [], []
+    for raw in paths:
+        q = raw.replace("\\", "/")
+        if pre and not q.startswith(pre):
+            outside.append(q)
+        else:
+            mine.append(q[len(pre):] if pre else q)
+    return mine, outside
+
+
 def self_test() -> int:
     """Prove it answers the case it was built for, and that it can say NO.
 
@@ -259,12 +289,17 @@ def main(argv) -> int:
         return 0
     if args[0] == "--self-test":
         return self_test()
+    outside: list[str] = []
     if args[0] == "--staged":
-        paths = _git(["diff", "--cached", "--name-only"])
+        paths, outside = _here(_git(["diff", "--cached", "--name-only"]))
     elif args[0] == "--changed":
-        paths = [line[3:] for line in _git(["status", "--porcelain"])]
+        paths, outside = _here([line[3:] for line in _git(["status", "--porcelain"])])
     else:
         paths = args
+    if outside:
+        print("outside app/, so nothing here maps them:")
+        for o in outside:
+            print("  " + o)
     if not paths:
         print("nothing changed")
         return 0

@@ -50,7 +50,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from asset_env import scratch_env  # noqa: E402  (one table of asset overrides, RULES section Q)
+from asset_env import PROJECT, scratch_env  # noqa: E402  (one table of asset overrides, RULES section Q)
 import mutation_anchors as anchors  # noqa: E402
 import worker_budget as budget  # noqa: E402
 # The bytecode-safe child environment, the stale-bytecode self-check and the
@@ -266,7 +266,7 @@ def child_env() -> dict:
     his 9mm sample in a tree that holds only `src` and `tests`), the offscreen
     platform, and NO bytecode from any source (a prefix cache is shared across
     trees, which is how a previous mutant's code gets served to the next one)."""
-    env = scratch_env(ROOT)
+    env = scratch_env(PROJECT)   # the assets live BESIDE app/, not inside it
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env.pop("PYTHONPYCACHEPREFIX", None)
     return env

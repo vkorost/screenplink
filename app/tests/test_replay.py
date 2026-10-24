@@ -266,5 +266,33 @@ def main() -> int:
     return 1
 
 
+def guarded_main() -> int:
+    """`main()` with a net under it, so a raise costs the checks AFTER it rather
+    than the whole report.
+
+    Why (2026-10-24, the same reason test_ghost grew this on 10-22): mutation
+    faults came back BROKEN -- "the suite crashed rather than failing the named
+    check" -- and measuring one by hand showed the check written for it HAD gone
+    red, fifteen times, before a later section raised. The attribution was sound
+    and unreadable, because a suite that dies prints no summary and the runner
+    refuses, correctly, to read a crash as a catch.
+
+    It does NOT make a crash a catch: the runner still needs a failing line
+    naming the fault's own check, and the crash itself is recorded as a failing
+    check, so the suite is red either way.
+    """
+    try:
+        return main()
+    except Exception as exc:                          # noqa: BLE001 - the finding
+        import traceback
+        check("the suite ran to its end without raising", False,
+              f"{type(exc).__name__}: {exc}")
+        tb = traceback.extract_tb(exc.__traceback__)[-1]
+        print(f"      raised at test_replay.py line {tb.lineno}: {tb.line}")
+        print()
+        print(f"{results.count(False)} OF {len(results)} CHECKS FAILED")
+        return 1
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(guarded_main())

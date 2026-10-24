@@ -57,9 +57,14 @@ def _heaviest() -> str:
 HEAVIEST = _heaviest()
 
 
+#: Module level so `guarded_main` below can record a crash as a failing check
+#: and still print a summary the mutation judge can read. It was local to
+#: main(), which meant a raise took the whole report with it.
+checks: list[bool] = []
+
+
 def main() -> int:
     QApplication.instance() or QApplication([])
-    checks: list[bool] = []
 
     def check(label: str, cond: bool, detail: str = "") -> None:
         checks.append(bool(cond))
@@ -912,8 +917,22 @@ def main() -> int:
           "between 0 and 1), not in screen pixels",
           len(aA.marks) == 2 and all(0.0 <= u <= 1.0 and 0.0 <= v <= 1.0
                                      for u, v, _g in aA.marks.holes), str(aA.marks.holes))
-    u7, v7, _g7 = aA.marks.holes[0]
-    uh, vh, _gh = aA.marks.holes[1]
+    # BOTH MARKS MUST STILL BE THERE, and that is a check, not an assumption.
+    # Indexing [0] and [1] straight off this list raised IndexError the moment a
+    # fault stopped the figure keeping its hits, which killed the suite before
+    # its summary: `mutate_figures` then called that fault BROKEN, "the suite
+    # crashed rather than failing the named check", although the check above
+    # ("carried by the figure in ITS coordinates") had already gone red. Measured
+    # by hand 2026-10-24. The placeholders let the rest of the section run and
+    # report; they are deliberately absurd, so nothing downstream can pass on
+    # them by accident.
+    check("both hits are KEPT on the walking figure, so the mark can be followed "
+          "frame by frame", len(aA.marks.holes) >= 2,
+          f"{len(aA.marks.holes)} kept of 2 -- the figure is not remembering where "
+          f"it was hit, and the rest of this section is measuring placeholders")
+    _kept = list(aA.marks.holes) + [(-1.0, -1.0, True)] * 2
+    u7, v7, _g7 = _kept[0]
+    uh, vh, _gh = _kept[1]
     stamps = [t_shot + 0.9, t_shot + 1.2, t_shot + 1.5, t_shot + 1.8,
               aA.t0 + aA.t_a + 0.5 * aA.t_h,
               aA.t0 + aA.t_a + aA.t_h + 0.5 * aA.t_r]
@@ -1783,5 +1802,34 @@ def main() -> int:
     return 0 if passed else 1
 
 
+def guarded_main() -> int:
+    """`main()` with a net under it, so a raise costs the checks AFTER it rather
+    than the whole report.
+
+    Why (2026-10-24, the same reason test_ghost grew this on 10-22): mutation
+    faults came back BROKEN -- "the suite crashed rather than failing the named
+    check" -- and measuring one by hand showed the check written for it HAD gone
+    red, fifteen times, before a later section raised. The attribution was sound
+    and unreadable, because a suite that dies prints no summary and the runner
+    refuses, correctly, to read a crash as a catch.
+
+    It does NOT make a crash a catch: the runner still needs a failing line
+    naming the fault's own check, and the crash itself is recorded as a failing
+    check, so the suite is red either way.
+    """
+    try:
+        return main()
+    except Exception as exc:                          # noqa: BLE001 - the finding
+        import traceback
+        checks.append(False)
+        print("  [FAIL] the suite ran to its end without raising -- "
+              f"{type(exc).__name__}: {exc}")
+        tb = traceback.extract_tb(exc.__traceback__)[-1]
+        print(f"      raised at test_figures.py line {tb.lineno}: {tb.line}")
+        print()
+        print(f"{checks.count(False)} OF {len(checks)} CHECKS FAILED")
+        return 1
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(guarded_main())

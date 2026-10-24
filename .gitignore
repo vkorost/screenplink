@@ -26,3 +26,30 @@ doctor-report.txt
 # refuses to put either of these in a release.
 app/config/settings.local.json
 app/config/calibration.json
+
+# ---------------------------------------------------------------------------
+# HIS OWN MATERIAL. In the working tree, never in the repository.
+#
+# Copied in 2026-10-23 when development moved here, so the harness and the
+# session hook work from this folder alone and nothing reaches back into
+# C:\WORKSPACE\Laser.Shooting.App any more.
+#
+# His criterion decided every line of it: "we will not release the files that
+# would not be needed by other people who decide to clone the repo and/or
+# contribute to the repo." RULES.md and CLAUDE.md are the agreement between
+# him and me -- "those are between me and you, people will not understand
+# what that file is for". The specs under requirements/ are working documents
+# that source comments cite. agent_reports/ is the session record. The two
+# config files carry a calibration measured on HIS camera in HIS room and the
+# sensitivity his own trigger pulls taught it: shipping them would hand a
+# stranger a mapping for a monitor they do not own.
+# ---------------------------------------------------------------------------
+/RULES.md
+/CLAUDE.md
+/.claude/
+/agent_reports/
+/requirements/
+/calib_backups/
+
+# test output: test_ui_smoke renders the target screen here
+/app/target_screen.png

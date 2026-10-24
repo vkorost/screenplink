@@ -54,7 +54,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from asset_env import scratch_env                          # noqa: E402  (one table of asset overrides)
+from asset_env import PROJECT, scratch_env                          # noqa: E402  (one table of asset overrides)
 import mutation_anchors as anchors  # noqa: E402
 import mutation_verdict as verdict  # noqa: E402  (the ONE judgement of a result)
 import worker_budget as budget  # noqa: E402
@@ -388,7 +388,7 @@ def suite_files(test: str) -> list[str]:
 
 def child_env() -> dict:
     """The environment every mutant's suite runs in: no bytecode, from any source."""
-    env = scratch_env(ROOT)
+    env = scratch_env(PROJECT)   # the assets live BESIDE app/, not inside it
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env.pop("PYTHONPYCACHEPREFIX", None)     # a prefix cache is shared across trees
     return env

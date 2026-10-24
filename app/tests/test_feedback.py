@@ -3622,7 +3622,17 @@ def main() -> int:
           _lab35(animating=False, listener=lis_r)._sens_refusal(
               _shot35(900, 300, FAINT_R, t=T0)) == "faint")
     lis_c = _listener35(clock=_time35.monotonic)
-    _click35(lis_c, _time35.monotonic() - 0.004)
+    # THE CLICK GOES AT THE SHOT'S OWN POSITION (T0 - 0.004), not at
+    # monotonic() - 0.004. Those are different epochs on Windows -- perf_counter
+    # is QPC, monotonic is GetTickCount64 -- so a click filed on the monotonic
+    # scale lands nowhere near T0, there is no click in the window at all, and
+    # the refusal came back "faint" for a reason that has nothing to do with the
+    # clock. The check therefore PASSED with the clock guard removed: measured
+    # 2026-10-24, when mutate_detector entry 18 came back MISSED.
+    #
+    # Filed here, the ONLY thing left to refuse it for is which clock the
+    # listener is on, which is the property this check is named after.
+    _click35(lis_c, T0 - 0.004)
     check("a listener on a DIFFERENT clock (RULES B4) corroborates nothing",
           (not lis_c.clock_is_perf_counter)
           and _lab35(animating=False, listener=lis_c)._sens_refusal(
@@ -3968,7 +3978,8 @@ def main() -> int:
           and not meter.is_ours(meter.parse_entry(sysnote)["exe"]))
     check("python, pythonw and the project path are ours; a browser is not",
           all(meter.is_ours(x) for x in (r"\Python313\python.exe", r"\Python313\pythonw.exe",
-                                         r"\WORKSPACE\Laser.Shooting.App\x.exe"))
+                                         r"\WORKSPACE\Laser.Shooting.App\x.exe",
+                                         r"\github\screenplink\screenplink.exe"))
           and not meter.is_ours(r"\Program Files\Google\Chrome\Application\chrome.exe"))
 
     entries = [

@@ -59,6 +59,20 @@ OWNED = (
 )
 
 
+#: Keys `isolate_outputs()` REWRITES in its copy of his settings, and the value
+#: each is forced to. The copy exists for RULES C15 -- the harness must race
+#: against his real `calibrate_seconds` and `settle_seconds`, not against easy
+#: defaults -- but the same file also records UI choices, and a test that
+#: inherits those is pinned to the state of the world (a phantom shot once put
+#: `players: 2` in there and two unrelated checks went red).
+#:
+#: Named here, and read by `test_rules` rather than retyped there, because the
+#: check that the copy is faithful has to know exactly which keys are allowed to
+#: differ. It compared BYTES until 2026-10-24 and so went red the moment his file
+#: needed re-serialising -- a check failing for a reason that is not a fault.
+NEUTRALISED = (("players", 1),)
+
+
 def path_of(rel: str) -> Path:
     """Where an OWNED entry lives. `config/...` is under ROOT (app/); `resources/<name>`
     is the asset folder `<name>`, answered by the asset table so that a scratch copy
@@ -148,7 +162,7 @@ def isolate_outputs(tag: str) -> Path:
         try:
             import json
             cfg = json.loads(iso.read_text(encoding="utf-8"))
-            for key, neutral in (("players", 1),):
+            for key, neutral in NEUTRALISED:
                 if key in cfg:
                     cfg[key] = neutral
             iso.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")

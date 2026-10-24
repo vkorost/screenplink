@@ -77,7 +77,12 @@ M = [
      "        pass", "test_figures.py", "image: a hit changes what is on screen"),
     ("a figure forgets where it was hit once the flash fades (no hole is kept)",
      "src/lsa/modes/figure.py", "        self.holes = (self.holes + [(u, v, good)])[-self.cap:]",
-     "        pass", "test_figures.py", "STILL marked"),
+     # NOT "STILL marked": measured 2026-10-24, that check PASSES with this fault
+     # in place (1876 pixels still differ, because the flash path leaves the mark,
+     # not the hole list). It named a check that cannot detect it -- the same shape
+     # as mutate_director entry 12, whose name was false. This is the check that
+     # does go red: the figure stops keeping its hits at all.
+     "        pass", "test_figures.py", "both hits are KEPT"),
     ("the hit feedback is drawn in the old warm accent",
      "src/lsa/modes/figure.py", "c = QColor(GREY_HIT if good else GREY_MISS)",
      "c = QColor('#d8c070')", "test_modes.py", "grey"),

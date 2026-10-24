@@ -112,6 +112,18 @@ placement can follow.
 | 🗺️ **[Project layout](PROJECT-LAYOUT.md)** | Every folder, for anyone changing the code |
 | 📕 **[Laser Training for Home Shooters][book]** | A Q4 2026 book on the laser dry-fire category: the apps, the targets, the sensors, the scoring and the failure modes. Built from a few AI deep-research reports over vendor documentation and owner reports, with nothing in it bought or borrowed. It is not about this project. It is a survey of dry laser shooting that I built for myself, to understand the landscape and to check whether what I was about to build already existed in some shape or form |
 
+## Credits, and what is actually mine
+
+The **code** is mine and is [Apache-2.0](LICENSE). The **assets are not all mine**
+and do not come under that licence, so if you fork this, they travel with their
+own terms rather than with mine.
+
+| | |
+|---|---|
+| **Sound effects** | From [Pixabay](https://pixabay.com/sound-effects/) |
+| **Images** | The startup screen, the fifteen target figures and their falls, the menu tiles and the magazine round were all generated with **Google Gemini** |
+| **Spoken lines** | Generated with [ElevenLabs](https://elevenlabs.io): twenty-two lines in three voices |
+
 ## Safety
 
 This is dry-fire practice: a laser cartridge or a laser pistol, and **no

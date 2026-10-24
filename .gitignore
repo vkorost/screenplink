@@ -10,13 +10,23 @@ __pycache__/
 app/tests/_out/
 build/
 dist/
+# *.spec catches the .spec files PyInstaller GENERATES. screenplink.spec is
+# not one of those: it is hand-written source, it is how the executable is
+# built, and without it the shipped source cannot rebuild the binary beside it.
 *.spec
+!app/packaging/screenplink.spec
 
 # Runtime state, written by the app on the machine it runs on
 app/logs/
 app/recordings/
 app/cache/
 app/reports/
+
+# NEVER. It carries an ElevenLabs API key in plaintext. It is absent from this
+# tree; this line is here so that copying it over from the old one cannot
+# publish the key with a single `git add -A`. packaging/assemble.py refuses a
+# release containing it, but nothing else guarded the repository.
+gen_voice_lines.py
 
 # Written by Doctor.cmd beside itself when it runs from source
 doctor-report.txt

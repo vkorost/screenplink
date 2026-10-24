@@ -16,6 +16,9 @@ neither the user nor Claude Code would ever look:
                               wedges the camera until it is physically replugged
     config/settings.default.json
                               GENERATED from the dataclass, never hand-written
+    source/                   THE WHOLE REPOSITORY, tests included, taken from
+                              `git archive HEAD` so it is exactly the tracked
+                              tree and cannot carry anything gitignored
 
 WHY THE DEFAULTS ARE GENERATED AND NOT SHIPPED AS A COPY
 --------------------------------------------------------
@@ -32,10 +35,25 @@ shows what is assumed before anything is measured, and gives the user a thing
 to look at when they want to reset. Generated from `AppSettings` so it cannot
 drift from the code the way a hand-written copy would.
 
+WHY THE SOURCE COMES FROM git archive AND NOT FROM A COPY OF THE FOLDER
+-----------------------------------------------------------------------
+He asked for the release to carry everything: the installer, the source and all
+the tests. The honest way to do that is to ship the TRACKED tree, because the
+set of things that must never ship is exactly the set git already ignores --
+the ElevenLabs key, his measured `config/`, the working notes, the calibration
+backups. A hand-rolled copy with an exclude list would be a second definition
+of that set, free to drift from the first. `git archive HEAD` cannot.
+
+The source is taken AS IT IS ON DISK, not from the commit, because that is what
+the executable beside it was built from. `source/BUILT-FROM.txt` names HEAD and
+lists anything that differs from it, so a reader can tell the two cases apart
+without this script refusing to build until someone commits.
+
 This script also REFUSES to produce a release that leaks anything, rather than
 trusting the spec's exclude list. `scripts/gen_voice_lines.py` carries an
 ElevenLabs API key in plaintext; it is gitignored, PyInstaller does not read
-gitignore, and a check beats a comment.
+gitignore, and a check beats a comment. That one check is NOT relaxed by
+shipping the source: the key file is untracked, so `git archive` never sees it.
 """
 
 from __future__ import annotations
@@ -43,6 +61,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -93,9 +112,19 @@ def check_no_leaks() -> list[str]:
                    f"would be trusted on a machine it means nothing about: {hit}")
     checked.append("no settings.local.json or calibration.json")
 
-    if list(OUT.rglob("test_*.py")) or (OUT / "_internal" / "tests").exists():
-        refuse("the test suite is in the release")
-    checked.append("no test suite")
+    # The tests SHIP (he asked for them), but they belong in source/, not
+    # inside the frozen bundle: _internal is what the exe imports from, and a
+    # suite in there would be dead weight the app could import by accident.
+    if list((OUT / "_internal").rglob("test_*.py")) or (OUT / "_internal" / "tests").exists():
+        refuse("the test suite is INSIDE the frozen bundle (_internal); it ships in source/")
+    checked.append("no test suite inside _internal/")
+
+    suite = OUT / "source" / "app" / "tests"
+    found = len(list(suite.glob("test_*.py"))) if suite.is_dir() else 0
+    if found < 20:
+        refuse(f"source/app/tests holds {found} suites: the release is supposed to "
+               f"carry all of them, and this tree has 26")
+    checked.append(f"source/app/tests carries {found} suites")
 
     # Staging material: 19 MB referenced nowhere in src/.
     if list(OUT.rglob("fall-originals")):
@@ -111,7 +140,132 @@ def check_no_leaks() -> list[str]:
                    f"would find nothing in this bundle. Rebuild from the current spec.")
     checked.append(f"every asset folder is under _internal/{ASSET_PARENT}/")
 
+    # ...AND EVERY FILE IN IT. A folder-level check cannot see a missing file,
+    # which is how bullet.png came to be absent from a release while images/
+    # was present and this gate said "every asset folder is under resources/".
+    # The magazine draws that file on every repaint of every drill, so the
+    # FileNotFoundError was raised inside paintEvent, `painted` never emitted,
+    # every Paint() timed out, and the app concluded its camera was blind --
+    # four seconds after measuring a 0.91mm mapping by photographing the same
+    # screen. Read as an intermittent camera fault for days.
+    #
+    # The invariant is equality, not presence: a bundle that trims an asset
+    # folder has to say so here, where it is a visible, reviewable act.
+    short = []
+    for name in ASSET_DIRS:
+        src = REPO / ASSET_PARENT / name
+        dst = OUT / "_internal" / ASSET_PARENT / name
+        if not src.is_dir():
+            continue
+        have = {q.relative_to(dst).as_posix() for q in dst.rglob("*") if q.is_file()}
+        want = {q.relative_to(src).as_posix() for q in src.rglob("*") if q.is_file()}
+        for rel in sorted(want - have):
+            short.append(f"{name}/{rel}")
+    if short:
+        refuse("the bundle is MISSING asset files the repository has. Anything "
+               "the app draws from one of these would raise inside paintEvent, "
+               "which stops the whole screen painting, not just that item:"
+               + "".join(chr(10) + "    " + m for m in short[:20])
+               + (chr(10) + f"    ... and {len(short) - 20} more" if len(short) > 20 else ""))
+    checked.append(f"every asset FILE is in the bundle ("
+                   + str(sum(1 for n in ASSET_DIRS
+                             for _ in (REPO / ASSET_PARENT / n).rglob("*")
+                             if _.is_file())) + " checked)")
+
     return checked
+
+
+# --------------------------------------------------------------------------
+# 1b. The source, straight from the tracked tree.
+# --------------------------------------------------------------------------
+REPO = ROOT.parent
+
+
+def _git(*args: str) -> str:
+    out = subprocess.run(("git", "-C", str(REPO)) + args,
+                         capture_output=True, text=True)
+    if out.returncode:
+        refuse(f"git {' '.join(args)} failed: {out.stderr.strip() or out.stdout.strip()}")
+    return out.stdout
+
+
+def copy_source() -> tuple[str, int]:
+    """Copy every TRACKED file into OUT/source, as it is on disk right now.
+
+    Tracked, because the set of things that must never ship is exactly the set
+    git already ignores: the ElevenLabs key, his measured config/, the working
+    notes, the calibration backups. An exclude list written here would be a
+    second definition of that set, free to drift from the first.
+
+    As it is on disk, because that is what the executable beside it was built
+    from. BUILT-FROM.txt names HEAD and lists anything that differs from it, so
+    the reader can tell a release built from a commit from one built from a
+    working tree, without this script having to forbid the second.
+    """
+    tracked = [f for f in _git("ls-files", "-z").split(chr(0)) if f]
+    if len(tracked) < 400:
+        refuse("git ls-files reports only " + str(len(tracked)) + " tracked files")
+
+    dest = OUT / "source"
+    if dest.exists():
+        shutil.rmtree(dest)
+
+    missing, files = [], 0
+    for rel in tracked:
+        src = REPO / rel
+        if not src.is_file():
+            missing.append(rel)
+            continue
+        dst = dest / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        files += 1
+    if missing:
+        refuse("tracked but not on disk, so the source would be incomplete:"
+               + "".join(chr(10) + "    " + m for m in missing))
+
+    suite = dest / "app" / "tests"
+    if not suite.is_dir():
+        refuse("app/tests did not reach source/: the release is supposed to "
+               "carry the tests")
+
+    commit = _git("rev-parse", "HEAD").strip()
+    when = _git("log", "-1", "--format=%cI").strip()
+    changed = sorted(ln[3:].strip().strip(chr(34))
+                     for ln in _git("status", "--porcelain").splitlines()
+                     if ln and not ln.startswith("??"))
+    changed = [c for c in changed if c in set(tracked)]
+
+    venv = chr(92).join(("app", ".venv", "Scripts", "python.exe"))
+    lines = [
+        "ScreenPlink source: every tracked file, exactly as it was on disk when",
+        "the executable beside it was built. Nothing is generated or trimmed.",
+        "",
+        "commit  " + commit,
+        "date    " + when,
+    ]
+    if changed:
+        lines += ["",
+                  "These files differ from that commit: the release was built from a",
+                  "working tree, and what is here is what it was built from.", ""]
+        lines += ["    " + c for c in changed]
+    lines += [
+        "",
+        "To run it from source you need Python and the dependencies:",
+        "",
+        "    python -m venv " + chr(92).join(("app", ".venv")),
+        "    " + venv + " -m pip install -r "
+        + chr(92).join(("app", "requirements.txt")),
+        "    " + chr(92).join(("app", "scripts", "Play.cmd")),
+        "",
+        "The tests need nothing further, and no camera:",
+        "",
+        "    " + chr(92).join(("app", "scripts", "run_tests.bat")),
+        "",
+    ]
+    (dest / "BUILT-FROM.txt").write_text(chr(10).join(lines), encoding="utf-8")
+    files += 1
+    return commit, files
 
 
 # --------------------------------------------------------------------------
@@ -177,7 +331,11 @@ def main() -> int:
             refuse(f"{stale} is in {OUT}: the release is ONE executable now. "
                    f"Rebuild from a clean build folder.")
 
-    print("=== gate: nothing secret, nothing of his ===")
+    print("=== source: every tracked file, as it is on disk ===")
+    commit, src_files = copy_source()
+    print(f"  source/{'':21} <- {src_files} files, at or past commit {commit[:8]}")
+
+    print(chr(10) + "=== gate: nothing secret, nothing of his ===")
     for line in check_no_leaks():
         print(f"  [ok] {line}")
 

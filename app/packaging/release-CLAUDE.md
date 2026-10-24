@@ -276,6 +276,70 @@ excess it carries, and ask the user to move other windows off that monitor.
 
 ---
 
+## WHEN IT BLAMES THE CAMERA, CHECK THAT THE SCREEN IS PAINTING
+
+Added 2026-10-24, after this exact verdict appeared on a healthy setup and was
+believed for most of a day:
+
+```
+NOT READY - the camera itself has to be fixed first.
+The camera is not delivering the app's own test dot.
+    the test dot read 0 at full red; 15 is the line, healthy is 25-97
+    DO THIS: ... unplug the camera and plug it back in
+```
+
+The camera was fine. A single artwork file was missing from the bundle, the
+`FileNotFoundError` was raised **inside `paintEvent`**, and so the signal that
+says "this frame is on the glass" never fired. Every wait-for-paint timed out,
+the self test drew no dots, and the exposure probe photographed a blank screen
+and reported that the camera could not see it.
+
+**Three things make this fast to spot, and all three are free.**
+
+**1. Cross-check the verdict against the measurements in the same launch.**
+The app said the camera was blind **four seconds after** measuring a mapping to
+0.91 mm held-out, which it does by photographing eighteen markers on that screen.
+Both cannot be true, and the mapping is the one backed by eighteen photographs.
+Ask `state`: a present mapping with a small held-out error, a sane floor and bar,
+and `ready_for_real_shots: true` are the app contradicting its own headline.
+
+**2. Read the app's STDERR, not only `logs/camera_lab.log`.** The log is the
+app's account of itself and it cannot describe a crash in its own paint path. A
+Python exception in `paintEvent` goes to stderr, where in one launch it appeared
+**1,722 times** while the log looked merely disappointing. If you started the app
+yourself, redirect stderr to a file and read it. One traceback there answers what
+an hour of log archaeology will not.
+
+**3. Treat an impossible measurement as the clue it is.** The exposure probe's
+three candidates, measured within the same second, read:
+
+```
+-4: dot 109      -5: dot 5      -6: dot 108
+```
+
+No exposure curve has that shape. A dot cannot be invisible at one stop and
+bright at the stops either side of it. That is not a dim dot, it is a photograph
+taken of a screen that had not been painted yet. **The probe photographs after a
+fixed sleep and does not wait for a paint**, so when a repaint is missed it
+measures a blank screen and blames the camera, silently. The self test waits
+properly and says `the paint did not arrive within 2000ms` instead: if you see
+that line even once, the fault is the screen, not the camera.
+
+It also explains apparent intermittency. Whether the fault appears depends on
+what is on screen, so pressing **C** on the menu can give a clean 12 of 12
+minutes after a startup self test gave 0 of 12 on the same hardware.
+
+**The order to work in:** read `state` and look for a measurement that
+contradicts the verdict; read stderr for a traceback; then, and only then,
+consider the camera. Running `press_key` with **C** re-runs the self check in
+seconds and is the cheapest second opinion available.
+
+### Two keys that are not what the list above implies
+
+**`O` and `T` are accepted only on the menu.** Sent inside a drill they are
+delivered and ignored with nothing logged and nothing on screen, which reads
+exactly like the app not listening. Go to the menu with **M** first.
+
 ## WHAT YOU MUST NOT DO
 
 - **Never write a camera control through the instrument.** The tools are read-only
@@ -292,6 +356,10 @@ excess it carries, and ask the user to move other windows off that monitor.
 - **Never conclude from one good run.** The chain is thirteen stages in series. At
   95% each that is a 51% chance of an end-to-end success, which is why "it worked
   once" has been wrong here more often than right.
+- **Never believe a conclusion over a measurement, including the app's own.**
+  The verdict is a finding, not the truth; `app_says` is labelled that way on
+  purpose. When it disagrees with the numbers beside it, the numbers win and
+  the disagreement itself is the thing to investigate.
 - **Do not read a measurement taken after the symptom passed as exoneration.** Ask
   when it was sampled relative to the fault. A reading from the recovered state
   looks exactly like a clean bill of health, and was once used to overrule a

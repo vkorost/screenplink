@@ -73,6 +73,17 @@ any feature.
 You can either clone the repo to your local drive or you can just download the release, unzip it, run **`Play.cmd`**. 
 `Doctor.cmd` checks your camera and writes a report.
 
+**Or do not set it up at all: ask Claude Code to.** Unzip the release, open the
+folder with [Claude Code](https://claude.com/claude-code), and ask it to set up
+the app. The release ships a `CLAUDE.md` written for exactly that job, and an
+`.mcp.json` so the session finds the app's own tools by itself. Nothing to
+configure first. It runs the camera doctor, picks the camera that is actually
+pointed at your monitor (by what each one measures, not by its name), starts the
+app, reads what the app measured about your room, and tells you when to shoot or
+which one physical thing is in the way.
+
+This is how the author sets it up now. See [Asking the app what it sees](MCP.md).
+
 From source:
 
 ```bat
@@ -110,6 +121,7 @@ placement can follow.
 | 📖 **[User Guide](manual/README.md)** | Thirteen chapters: the screen it needs, setup, the nine drills, the magazine, the score, two players and every key. PDF and EPUB included |
 | 🔧 **[Troubleshooting](TROUBLESHOOTING.md)** | When the app does not work. Start at the top: the most common fault is not in this app at all |
 | 🗺️ **[Project layout](PROJECT-LAYOUT.md)** | Every folder, for anyone changing the code |
+| 🤖 **[Asking the app what it sees](MCP.md)** | The app answers questions about itself while it runs, over MCP or plain HTTP: what the detector scored, what is painted, what it measured and why. Measurements, never conclusions |
 | 📕 **[Laser Training for Home Shooters][book]** | A Q4 2026 book on the laser dry-fire category: the apps, the targets, the sensors, the scoring and the failure modes. Built from a few AI deep-research reports over vendor documentation and owner reports, with nothing in it bought or borrowed. It is not about this project. It is a survey of dry laser shooting that I built for myself, to understand the landscape and to check whether what I was about to build already existed in some shape or form |
 
 ## Credits, and what is actually mine

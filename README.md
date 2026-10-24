@@ -28,7 +28,9 @@ in the dark, but a room you can dim is a room this works better in.
   empty and you get a click instead of a bang.
 - **Two players on one screen**, left and right, scored separately, each with
   their own magazine and their own score. Play someone else, or take both halves
-  yourself with a pistol in each hand and work your weak side.
+  yourself with a pistol in each hand and work your weak side. **Two lasers
+  landing in the same camera frame are detected as two separate shots**, so
+  firing together is not a problem.
 - **Shoot the menu.** The menu is targets too, so you never need the keyboard.
 - **It sets itself up without you firing a shot.** It photographs its own markers
   on the screen to learn where the screen is and which pixel is which, so
@@ -128,6 +130,7 @@ placement can follow.
 | 📖 **[User Guide](manual/README.md)** | Thirteen chapters: the screen it needs, setup, the nine drills, the magazine, the score, two players and every key. PDF and EPUB included |
 | 🔧 **[Troubleshooting](TROUBLESHOOTING.md)** | When the app does not work. Start at the top: the most common fault is not in this app at all |
 | 🗺️ **[Project layout](PROJECT-LAYOUT.md)** | Every folder, for anyone changing the code |
+| 🧭 **[Lessons learned](LESSONS-LEARNED.md)** | Twenty things this project got wrong and what each one cost. Mostly not about lasers: measuring the wrong quantity, checks that could not fail, a cleanup that only worked by accident, a note that stopped being true |
 | 🤖 **[Asking the app what it sees](MCP.md)** | The app answers questions about itself while it runs, over MCP or plain HTTP: what the detector scored, what is painted, what it measured and why. Measurements, never conclusions |
 | 📕 **[Laser Training for Home Shooters][book]** | A Q4 2026 book on the laser dry-fire category: the apps, the targets, the sensors, the scoring and the failure modes. Built from a few AI deep-research reports over vendor documentation and owner reports, with nothing in it bought or borrowed. It is not about this project. It is a survey of dry laser shooting that I built for myself, to understand the landscape and to check whether what I was about to build already existed in some shape or form |
 

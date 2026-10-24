@@ -32,6 +32,19 @@ Full source code included with the build. Free, offline, no account, no ads. Ver
 📖 **The [User Guide](manual/README.md) describes the gameplay exactly** — every
 drill and how it is scored, the magazine, two players, and every key.
 
+## Why this exists
+
+In Q4 2026 I went looking for a free game that would let me shoot moving targets
+on my own computer monitor with my laser trainer pistols. I did not find anything
+quite like that.
+
+So I read up on the dry-fire laser landscape, and worked out that it ought to be
+possible — provided the monitor is matte and the camera does at least 60 frames
+per second. Then I built the game I wanted, to my own taste and my own
+requirements.
+
+I am sharing it in case a few other people find it useful.
+
 ## What you need
 
 | | |

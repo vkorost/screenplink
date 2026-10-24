@@ -102,7 +102,7 @@ STAGED=$(git diff --cached --name-only | sed 's#^app/##')
 NOT_PROSE=$(
     { printf '%s
 ' "$STAGED" | grep -v '^$' \
-        | grep -vE '\.(md|pdf|epub|jpe?g|png|gif|svg)$|^manual/' || true
+        | grep -vE '\.(md|pdf|epub|jpe?g|png|gif|svg)$|^manual/|^(LICEN[CS]E|NOTICE|AUTHORS|CHANGELOG|CONTRIBUTING)$' || true
       printf '%s
 ' "$STAGED" \
         | grep -E '^(RULES|CLAUDE)\.md$|^(requirements|resources|packaging|src|tests|tools|scripts|\.claude)/' || true

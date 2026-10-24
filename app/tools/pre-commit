@@ -95,9 +95,18 @@ STAGED=$(git diff --cached --name-only | sed 's#^app/##')
 #   resources/**                 test_artwork, test_ceiling
 # Anything the pattern does not recognise is treated as code and runs the lot,
 # which is the direction a mistake here has to fail in.
-NOT_PROSE=$(printf '%s
-' "$STAGED" | grep -v '^$'     | grep -vE '\.(md|pdf|epub|jpe?g|png|gif|svg)$|^manual/'     ; printf '%s
-' "$STAGED"     | grep -E '^(RULES|CLAUDE)\.md$|^(requirements|resources|packaging|src|tests|tools|scripts|\.claude)/' )
+# Each grep is guarded: grep exits 1 when it matches nothing, which is
+# EXACTLY the prose-only case, and `set -e` then killed the hook silently --
+# refusing every documentation commit, the opposite of the point. The first
+# of the two is the one that bites, and guarding only the last did not help.
+NOT_PROSE=$(
+    { printf '%s
+' "$STAGED" | grep -v '^$' \
+        | grep -vE '\.(md|pdf|epub|jpe?g|png|gif|svg)$|^manual/' || true
+      printf '%s
+' "$STAGED" \
+        | grep -E '^(RULES|CLAUDE)\.md$|^(requirements|resources|packaging|src|tests|tools|scripts|\.claude)/' || true
+    })
 if [ -z "$(printf '%s' "$NOT_PROSE" | tr -d '[:space:]')" ] && [ -n "$STAGED" ]; then
     printf '[pre-commit] documentation only -- no suite reads these, so none is run:
 '

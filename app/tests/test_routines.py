@@ -592,9 +592,20 @@ class ProbeLab:
     _shooting_exposure = -4.0
     _probe_floor_at = None           # the real lab declares it in __init__
 
+    #: How many times the probe asked us to keep the frames it gave up on.
+    #: The stand-in MIRRORS the real lab here rather than leaving the method
+    #: off: without it the bail path raised AttributeError inside the probe,
+    #: which is a stand-in excusing its consumer (RULES C12) -- the same shape
+    #: as `gain_at_open` having to be mirrored by the fake camera.
+    saved_probe_frames = 0
+
+    def _save_probe_evidence(self, lit, dark) -> None:
+        self.saved_probe_frames += 1
+
     def __init__(self, weak, strong, has_strong=True, guess=False):
         self.weak, self.strong = weak, strong
         self.has_strong, self.guess = has_strong, guess
+        self.saved_probe_frames = 0
         self.exposure = None
         self.dot = None
         self.scene = _Scene(self)
@@ -814,6 +825,25 @@ for value, what in ((0, "0 (camera wedged, early-return path)"),
     check(lab._probe_dot_reading == float(value),
           f"a dot that reads {what} is recorded as {value}",
           f"{lab._probe_dot_reading}")
+
+# AND THE BAIL PATH KEEPS ITS EVIDENCE.
+#
+# "The emulated dot is not reaching the camera" sends the user to unplug a
+# camera, and on 2026-10-24 it said that about a healthy one: the next launch
+# read 108 at the same exposure and reached READY 12/12. The log holds only the
+# number, so the two photographs it judged are the only way to tell a missed
+# frame from a covered screen. This asserts they are kept on the path that
+# gives up, and only there.
+_bail = FlatLab(0)
+drive_probe(_bail)
+check(_bail.saved_probe_frames == 1,
+      "the probe keeps the pair of photographs it gave up on",
+      f"saved {_bail.saved_probe_frames} times")
+_fine = FlatLab(44)
+drive_probe(_fine)
+check(_fine.saved_probe_frames == 0,
+      "...and a healthy probe saves nothing",
+      f"saved {_fine.saved_probe_frames} times")
 
 
 class NoFrameLab(FlatLab):

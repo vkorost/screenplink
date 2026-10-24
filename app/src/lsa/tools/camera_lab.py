@@ -9980,6 +9980,35 @@ class CameraLab(QMainWindow):
     # dot reaches well past the 2*PROBE_SPOT_HALF window, so blank 2.5x it.
     PROBE_FLOOR_EXCLUDE_PX = 100
 
+    def _save_probe_evidence(self, lit, dark) -> None:
+        """Keep the two photographs the probe gave up on.
+
+        The probe's "the emulated dot is not reaching the camera" is the one
+        conclusion in this app that cannot be checked from the log, because the
+        log holds only the number it computed. On 2026-10-24 it fired on a
+        healthy bench -- camera opening in 0.42s, monitor awake, the target
+        screen in front of it by the app's own window check, and the very next
+        launch reading 108 at the same exposure and reaching READY 12/12 -- and
+        the advice it produced was to unplug a camera that had nothing wrong.
+
+        One pair of PNGs turns the next occurrence into a one-second question:
+        is the dot on the screen in `probe_lit`, or is it not? Writing them
+        costs nothing on a path that is already ending the probe, and nothing
+        downstream reads them -- they are for a person.
+        """
+        try:
+            import cv2 as _c
+            RECORDINGS.mkdir(parents=True, exist_ok=True)
+            for name, frame in (("probe_lit", lit), ("probe_dark", dark)):
+                if frame is not None:
+                    _c.imwrite(str(RECORDINGS / f"{name}.png"), frame)
+            self._log(f"    kept what the probe judged: "
+                      f"{RECORDINGS / 'probe_lit.png'} and probe_dark.png -- "
+                      f"if the dot IS on the screen in probe_lit, the camera "
+                      f"missed a frame and the advice below is wrong")
+        except Exception as exc:                             # noqa: BLE001
+            self._log(f"    (could not save the probe's frames: {exc!r})")
+
     def _probe_measure_pair(self, lit, dark, weak, strong):
         """(weak_peak, floor, mean, strong_peak) from ONE lit/dark pair that
         carries the dot at two places.

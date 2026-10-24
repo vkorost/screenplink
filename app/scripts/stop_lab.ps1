@@ -72,30 +72,97 @@ public class Win {
 }
 '@
 
-$procs = Get-Process python, pythonw -ErrorAction SilentlyContinue
-if (-not $procs) { Write-Output 'nothing running'; exit 0 }
-$pids = @($procs | ForEach-Object { $_.Id })
-Write-Output "$($procs.Count) process(es): $($pids -join ', ')"
+# WHICH PROCESSES ARE OURS: the ones that OWN A ScreenPlink WINDOW. Never
+# "every python on this machine".
+#
+# Measured 2026-10-24. `Get-Process python, pythonw` selects by EXECUTABLE NAME,
+# which had two consequences, and the second is the one that did the damage:
+#
+#   * it FORCE-KILLED UNRELATED INTERPRETERS. It killed two stray python
+#     processes belonging to another piece of work; a `pip install` cut off
+#     mid-write leaves a broken virtual environment, and a suite cut off
+#     mid-run leaves a scratch tree full of mutated source.
+#   * its success condition was "no python exists anywhere", so with any other
+#     python running it could NEVER report a clean close. It always fell through
+#     to forcing and printed the camera-wedge warning -- while the app had in
+#     fact exited cleanly two minutes earlier. A diagnostic that reports damage
+#     it did not do gets believed: it was, and that report was passed on to him
+#     as fact.
+#
+# So identify the app by what it IS, the owner of our window, not by the name of
+# the interpreter it happens to run under. That is the same discriminator
+# mistake as asking "which routine is running" instead of "could this be a
+# trigger pull", and as choosing an exposure on mean frame brightness (C6).
 
-# The operator console is the window that owns closeEvent. Close THAT, not the
-# target screen, and not 'whatever Windows calls main'.
-$targets = @()
-foreach ($row in [Win]::Windows()) {
+# TWO INDEPENDENT PROPERTIES, never one string. An EXACT window title that the
+# app actually sets, AND an owning process that is one of ours.
+#
+# `-like 'ScreenPlink*'` was tried first and matched, on the first run,
+#     ScreenPlink - VK_Obsidian - Obsidian 1.14.4
+# which is his NOTES, open on a file named after this project. A prefix match
+# would have sent WM_CLOSE to an editor holding unsaved work the moment one of
+# its windows mentioned "Camera Lab". Identifying anything here by a string
+# alone is the mistake these notes already record for camera names and indices:
+# "identify by WHAT IT DOES", and for a window that means the title the app
+# itself sets plus the process it runs under.
+$TITLES = @('ScreenPlink - Camera Lab', 'ScreenPlink - Target', 'ScreenPlink')
+$MINE = @('python', 'pythonw', 'screenplink')      # screenplink.exe: the frozen build
+
+$all = @([Win]::Windows())
+$ours = @()
+foreach ($row in $all) {
     $parts = $row -split '\|', 3
-    if ($pids -notcontains [int]$parts[1]) { continue }
-    Write-Output "   window: $($parts[2])"
-    if ($parts[2] -like '*Camera Lab*') { $targets += [IntPtr][int64]$parts[0] }
+    if ($TITLES -notcontains $parts[2]) { continue }
+    $owner = Get-Process -Id ([int]$parts[1]) -ErrorAction SilentlyContinue
+    if (-not $owner) { continue }
+    if ($MINE -notcontains $owner.ProcessName) {
+        Write-Output "   ignoring '$($parts[2])' -- owned by $($owner.ProcessName), not ours"
+        continue
+    }
+    $ours += , @([IntPtr][int64]$parts[0], [int]$parts[1], $parts[2])
 }
 
-if ($targets.Count -eq 0) {
-    # No console window found -- fall back, but say so, because closing the
-    # target screen alone has never once shut this app down.
-    Write-Output 'WARNING: no Camera Lab window found; falling back to CloseMainWindow'
-    foreach ($p in $procs) { $null = $p.CloseMainWindow() }
-} else {
-    Write-Output "asking the Camera Lab window to close ($($targets.Count))..."
-    foreach ($h in $targets) { [Win]::Close($h) }
+if ($ours.Count -eq 0) {
+    if (Get-Process python, pythonw -ErrorAction SilentlyContinue) {
+        Write-Output 'no ScreenPlink window exists, but python IS running.'
+        Write-Output '  Refusing to force an interpreter that may not be ours -- that has'
+        Write-Output '  happened, and it killed work belonging to another session. If the app is still'
+        Write-Output '  starting, wait for its window; if it is wedged with no window at'
+        Write-Output '  all, name the process by hand, deliberately.'
+        exit 2
+    }
+    Write-Output 'ScreenPlink is not running'
+    exit 0
 }
+
+$appPids = @($ours | ForEach-Object { $_[1] } | Sort-Object -Unique)
+# The venv's pythonw.exe is a launcher STUB that spawns the real interpreter, so
+# the parent owns no window and exits only after its child. It is ours, and the
+# wait below has to know that, or a clean close reads as a failure to close.
+foreach ($one in @($appPids)) {
+    try {
+        $par = (Get-CimInstance Win32_Process -Filter "ProcessId=$one").ParentProcessId
+        $pp = Get-Process -Id $par -ErrorAction SilentlyContinue
+        if ($pp -and (@('python', 'pythonw') -contains $pp.ProcessName)) { $appPids += [int]$par }
+    } catch { }
+}
+$appPids = @($appPids | Sort-Object -Unique)
+
+Write-Output "ScreenPlink: $($appPids.Count) process(es): $($appPids -join ', ')"
+foreach ($w in $ours) { Write-Output "   window: $($w[2])" }
+
+# The CONSOLE is the window that owns closeEvent. Close THAT, not the target
+# screen, and not 'whatever Windows calls main'.
+$targets = @($ours | Where-Object { $_[2] -like '*Camera Lab*' } | ForEach-Object { $_[0] })
+if ($targets.Count -eq 0) {
+    Write-Output 'WARNING: only the target screen is open, and closing it does NOT shut'
+    Write-Output '  the app down -- it closes itself and the console never hears it, which'
+    Write-Output '  is the 2026-10-15 fault. Press Escape on the target screen: that asks'
+    Write-Output '  the console to quit the way the app would.'
+    exit 2
+}
+Write-Output "asking the Camera Lab window to close ($($targets.Count))..."
+foreach ($h in $targets) { [Win]::Close($h) }
 
 # Longer than the old 5s, because a clean exit is worth waiting for: the app's
 # own disconnect allows 800ms for a capture thread that may be blocked inside
@@ -104,7 +171,7 @@ if ($targets.Count -eq 0) {
 $sw = [Diagnostics.Stopwatch]::StartNew()
 for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Milliseconds 500
-    if (-not (Get-Process python, pythonw -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Process -Id $appPids -ErrorAction SilentlyContinue)) {
         Write-Output "closed cleanly in $([int]$sw.Elapsed.TotalSeconds)s"
         exit 0
     }
@@ -114,5 +181,6 @@ Write-Output 'WARNING: did not close in 15s - forcing.'
 Write-Output '  This breaks the recording AND risks wedging the camera until it'
 Write-Output '  is physically replugged. If you see this, something is wrong in'
 Write-Output '  closeEvent and it needs fixing rather than forcing.'
-Get-Process python, pythonw -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Write-Output "  Forcing ONLY ours: $($appPids -join ', ')"
+Get-Process -Id $appPids -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 exit 1

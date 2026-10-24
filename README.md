@@ -181,7 +181,7 @@ corners of the monitor — calibration needs them.
 ## Tests
 
 ```bat
-run_tests.bat
+app\scripts\run_tests.bat
 ```
 
 Neither suite needs a camera or a display. `test_detector.py` plays synthetic
@@ -190,6 +190,28 @@ guns offset in time, rapid fire at one spot, and an off-axis elliptical dot.
 `test_ui_smoke.py` builds the entire UI headless and renders the target screen
 to `target_screen.png`, checking among other things that nothing drawn on it is
 red enough for the camera to mistake for a laser.
+
+## If you cannot hear the gunshot
+
+**Check the Windows volume mixer before anything else.** Windows keeps a volume
+per application *per output device*, identifies the application by its
+executable path, and can set it silently. A virtual environment you build
+yourself therefore gets its own entry, and raising it for one Python does not
+cover the next one you create.
+
+This cost three days on this project. The app opened the correct device, loaded
+the correct sample, and wrote `gunshot ... played on <device>` in its log, while
+the slider for `pythonw.exe` sat at 0%. Every symptom pointed at the app: no
+bang, the microphone never learned to tell our gunshot from yours, and the shot
+counter reported trigger pulls as "heard but not seen".
+
+    Right-click the speaker in the tray -> Open volume mixer
+    -> find python.exe / pythonw.exe (or screenplink.exe) -> raise it
+
+The mixer only lists an application while it is running, so start the app first.
+The app reports what it finds and never changes it. `app\tools\audio_meter.py`
+prints the volume Windows has stored for every entry it remembers about us,
+including applications that are not currently running.
 
 ## Safety
 

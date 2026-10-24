@@ -253,6 +253,25 @@ def exposure_probe(lab: Any) -> Generator:
                 # register" -- and chose an exposure from it anyway. A rule
                 # that cannot see its input must say so, not average it.
                 if peak < max(2.0, floor + 1.0):
+                    # SAVE WHAT IT JUDGED, because the conclusion below is the
+                    # one the app cannot check for itself.
+                    #
+                    # 2026-10-24: this fired on a healthy bench. The camera was
+                    # fine (it opened in 0.42s with no read failures), the
+                    # monitor was awake, the target screen was in front of it
+                    # five seconds earlier by the app's own window check, and
+                    # the next launch read 108 at the same exposure and reached
+                    # READY 12/12. So the message below -- "something is
+                    # covering the screen" -- sent the user to unplug a camera
+                    # that had nothing wrong with it, which is the advice this
+                    # project has twice promised not to give.
+                    #
+                    # One launch in two. Until the cause is known, the pair of
+                    # photographs it decided on is the whole evidence, and
+                    # "save a frame and LOOK at it" is the step that has
+                    # settled six of these. It costs two PNGs on a path that
+                    # already ends the probe.
+                    yield Call(lambda: lab._save_probe_evidence(lit, dark))
                     yield Log(f"    the emulated dot is not reaching the "
                               f"camera (it reads {peak:.0f} at full red, "
                               f"against a background of {floor:.0f} peaking at "

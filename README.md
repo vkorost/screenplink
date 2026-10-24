@@ -26,6 +26,9 @@ Full source code included with the build. Free, offline, no account, no ads. Ver
 - **It tells you when it is ready**, in about thirty seconds, or tells you the one
   thing to fix.
 
+📖 **The [User Guide](manual/README.md) describes the gameplay exactly** — every
+drill and how it is scored, the magazine, two players, and every key.
+
 ## What you need
 
 | | |

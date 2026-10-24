@@ -73,6 +73,39 @@ fail() {
 
 STAGED=$(git diff --cached --name-only | sed 's#^app/##')
 
+# ---- 0. PROSE IS NOT CODE, AND NO CHECK READS IT ----------------------
+#
+# Everything below this line is unconditional: the rules, the Director, the
+# mutation check that proves those can fail, and 26 suites. That is right for
+# code and absurd for a README -- a one-line documentation edit was costing
+# minutes of proving that checks on untouched code can still fail. Asked for
+# directly on 2026-10-24: "we will make lots of changes to the markup files and
+# I can't wait an hour to make every single change that I want."
+#
+# A hook that charges minutes for prose is a hook people learn to bypass with
+# --no-verify, and then it is not protecting the code either.
+#
+# THE RULE IS FAIL-SAFE: a path counts as documentation only if it is a
+# document AND is not one of the documents a suite actually reads. Verified
+# 2026-10-24 by grepping tests/ -- nothing reads README.md, TROUBLESHOOTING.md,
+# PROJECT-LAYOUT.md or manual/. These DO get read and must never be skipped:
+#   RULES.md, CLAUDE.md          test_rules sections K and L
+#   requirements/*.md            test_voice section 10
+#   packaging/release-*.md       test_doctor
+#   resources/**                 test_artwork, test_ceiling
+# Anything the pattern does not recognise is treated as code and runs the lot,
+# which is the direction a mistake here has to fail in.
+NOT_PROSE=$(printf '%s
+' "$STAGED" | grep -v '^$'     | grep -vE '\.(md|pdf|epub|jpe?g|png|gif|svg)$|^manual/'     ; printf '%s
+' "$STAGED"     | grep -E '^(RULES|CLAUDE)\.md$|^(requirements|resources|packaging|src|tests|tools|scripts|\.claude)/' )
+if [ -z "$(printf '%s' "$NOT_PROSE" | tr -d '[:space:]')" ] && [ -n "$STAGED" ]; then
+    printf '[pre-commit] documentation only -- no suite reads these, so none is run:
+'
+    printf '    %s
+' $STAGED
+    exit 0
+fi
+
 # ---- 1. the rules, executing ------------------------------------------
 say "the rules that can execute"
 "$PY" tests/test_rules.py >/dev/null 2>&1 || {

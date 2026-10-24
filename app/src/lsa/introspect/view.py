@@ -1840,17 +1840,18 @@ def _version() -> str:
     answered, so a report can never be attributed to the wrong build."""
     if _VERSION_CACHE:
         return _VERSION_CACHE[0]
-    root = assets.bundle_root()      # a frozen bundle has no .git: "unknown", honestly
-    out = "unknown"
+    from .. import __version__
+    root = assets.bundle_root()      # a frozen bundle has no .git to read
+    out = __version__
     try:
         head = (root / ".git" / "HEAD").read_text(encoding="utf-8").strip()
         if head.startswith("ref: "):
             ref = (root / ".git" / head[5:]).read_text(encoding="utf-8").strip()
-            out = ref[:12]
+            out = __version__ + "+" + ref[:12]
         else:
-            out = head[:12]
+            out = __version__ + "+" + head[:12]
     except Exception:                                    # pragma: no cover
-        out = "unknown"
+        pass                        # frozen, or no .git: the version alone
     _VERSION_CACHE.append(out)
     return out
 

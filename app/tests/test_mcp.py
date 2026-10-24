@@ -174,6 +174,20 @@ for node in ast.walk(tree):
 non_std = sorted(m for m in mods if m not in sys.stdlib_module_names)
 check(not non_std, "mcp.py imports only the standard library", f"{non_std}")
 
+# mcp.py may not IMPORT the version (stdlib only, above), so it carries a
+# literal. Two copies of one fact is a seam, and this project loses days in
+# seams, so the copies are checked against each other here.
+_pkg_init = (SRC / "lsa" / "__init__.py").read_text(encoding="utf-8")
+_declared = ""
+for _line in _pkg_init.splitlines():
+    if _line.startswith("__version__"):
+        _declared = _line.split("=", 1)[1].split("#")[0].strip().strip(chr(34)).strip(chr(39))
+        break
+check(bool(_declared), "lsa/__init__.py declares __version__", _declared)
+check(_declared == mcp.SERVER_VERSION,
+      "the MCP server reports the product version, not one of its own",
+      f"lsa.__version__={_declared!r} mcp.SERVER_VERSION={mcp.SERVER_VERSION!r}")
+
 _ENV = dict(os.environ)
 _ENV["PYTHONPATH"] = str(SRC)
 _ENV.pop("LSA_INTROSPECT", None)

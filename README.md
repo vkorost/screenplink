@@ -23,6 +23,9 @@ Full source code included with the build. Free, offline, no account, no ads. Ver
   empty and you get a click instead of a bang.
 - **Two players on one screen**, left and right, scored separately.
 - **Shoot the menu** — the menu is targets too. You never need the keyboard.
+- **It sets itself up without you firing a shot.** It photographs its own markers
+  on the screen to learn where the screen is and which pixel is which, so
+  calibration costs you no ammunition and no patience.
 - **It tells you when it is ready**, in about thirty seconds, or tells you the one
   thing to fix.
 
@@ -36,6 +39,22 @@ drill and how it is scored, the magazine, two players, and every key.
 | **A matte monitor** | Anti-glare, not glossy, not a TV. This one is not negotiable — see the physics below |
 | **A webcam** | Anything that does 60 fps. It goes *beside* the monitor, angled at it — not downrange |
 | **A laser trainer** | Any visible red (650 nm) cartridge or trainer pistol. Two work at once |
+
+### One setup, honestly
+
+All of this was built and measured against **exactly one rig**: a **Dell U4320Q**
+(42.5″ 4K, matte) watched by a **Razer Kiyo Pro**, shot with two **LaserLyte
+LT-TTL** trainers. Nothing is hard-coded to any of it — the app measures your
+camera and your room rather than assuming mine — but one monitor and one webcam
+is one monitor and one webcam. Your camera may report its exposure differently,
+your panel may scatter the dot differently, and you may meet something I never
+did.
+
+That is what **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** is for. It is written
+from the faults this hardware actually produced, and it lists the numbers a
+healthy setup gives, so you can tell how far yours is from working. If you hit
+something that is not in it, open an issue — a second rig is worth more to this
+project than any feature.
 
 ## Get it
 

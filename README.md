@@ -123,6 +123,33 @@ placement can follow.
 
 🔬 The full explanation is a short video: *(link coming)*
 
+## If you are building something like this
+
+Two weeks of building this produced a long list of mistakes, and I wrote them
+down as I went: **[Lessons learned](LESSONS-LEARNED.md)**. Twenty of them, each
+with the measurement that caused it.
+
+I am putting it in front of you because almost none of it is about lasers. It is
+about the things that go wrong when a program has to measure the physical world
+and then decide something on the strength of it:
+
+- I chose an exposure by a number that **correlated** with what I cared about
+  instead of the thing itself, and darkening the room, the single best condition
+  this app can have, is what broke it.
+- My whole-launch test harness **exited after its first launch and reported
+  success**, for as long as it had existed. A figure I had quoted for days had
+  never been measured.
+- A cleanup worked for weeks **because of what happened to run after it**, and
+  failed the day that stopped being true.
+- One missing file raised an exception inside a paint handler, and the app spent
+  days telling me to unplug a camera that was measuring sub-millimetre accuracy
+  four seconds earlier.
+
+If you are writing anything with a camera, a real-time loop, or a program that
+has to diagnose its own hardware and explain itself to a human, I think you will
+recognise several of these, and some of them are cheaper to read about than to
+find. There is nothing personal in that file and nothing specific to my setup.
+
 ## Read more
 
 | | |

@@ -53,3 +53,9 @@ app/config/calibration.json
 
 # test output: test_ui_smoke renders the target screen here
 /app/target_screen.png
+
+# Rewritten by test_align on every run and compared against by nothing; its own
+# source comment says it must be gitignored. It was tracked when the repository
+# was split, so every commit carried a spurious binary change -- which is how a
+# real one gets missed.
+/app/tests/_align_reference.png

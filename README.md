@@ -1,182 +1,238 @@
-# Laser Shooting App
+# ScreenPlink
 
-Dry-fire laser training on a PC monitor. Targets appear on screen, a USB camera
-watches the screen, and when you fire a laser trainer pistol at it the app works
-out which pixel you hit, marks it and makes a noise.
+**Dry-fire laser training where the monitor itself is the target.** The app draws
+targets on your screen, an ordinary USB webcam watches that screen from the side,
+and when you fire a laser trainer pistol at it the app works out which pixel you
+hit, marks it, and makes a noise.
 
-Built for Windows, for LaserLyte LT-TTL trainers and a Logitech C920 — though
-nothing is hard-coded to those.
+No paper targets. No projector. Nothing laid over the screen — no diffusion
+film, no cling film, no fabric. No proprietary camera, no infrared, and nothing
+attached to the gun beyond the laser cartridge you already own. Free, offline,
+no account.
 
-**Status: the game exists.** Nine drills, a seventeen-round magazine, scoring, a
-shoot-at-it menu and a two-player split screen, packaged as a single Windows
-executable. Everything below this line is still the Camera Lab instrument the app
-was built on top of, and is out of date as a description of the product.
+<!-- DELIBERATE DIFFERENCE, DO NOT "FIX" IT (agreed with the trailer session,
+     2026-10-24). The trailer narration says "No projector. No special screen.
+     No paper targets." This file deliberately does NOT say "no special screen",
+     and states the matte requirement instead.
+
+     They are not in conflict. In the trailer, "no special screen" means nothing
+     you have to buy, fit or lay over the panel -- true, and the contrast that
+     lands in eight seconds of voiceover. The README and the video description
+     are where there is room to say which panels actually work, which is why the
+     caveat was assigned here rather than to the script.
+
+     The narration is already rendered to audio in two voices, so changing that
+     line costs a re-render, not an edit. If it ever does change, the trailer
+     session sends the exact replacement and THIS file follows it: the README is
+     the canonical phrasing and the video description is lifted from the two
+     sentences above. Do not align them the other way round, and do not quietly
+     reword either one to match the other. -->
+
+**The one thing it does require is a matte, anti-glare monitor** — not glossy,
+not a television. That is physics, not a preference, and it is the first thing
+to check before anything else here.
+
+> **Read the [User Guide](manual/README.md) first if you just want to shoot.**
+> Thirteen chapters, plus PDF and EPUB, indexed there. Start with
+> [what the screen has to be](manual/chapters/01-the-screen-it-needs.md) — it
+> decides whether anything else works. This file is for people who want to know
+> how it works, or to change it.
+>
+> Something not working? **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** — start
+> there, and start at the top: the most common fault is not in this app at all.
+>
+> Finding your way around the source? **[PROJECT-LAYOUT.md](PROJECT-LAYOUT.md)**.
 
 ---
 
-## The screen it needs
+## What it is, precisely
 
-**A matte (anti-glare) monitor.** This is the one hardware requirement nothing
-else can make up for, so it is worth settling before anything else.
+> ScreenPlink turns a compatible matte monitor into a two-player laser dry-fire
+> target, using an ordinary USB webcam positioned off-axis — with measured
+> camera-to-screen calibration, sensitivity learned from real shots, and a
+> camera-verified simulated-shot self-test. It runs free and offline, without an
+> account or installer.
 
-**Nothing goes on top of the screen.** Some camera-based systems ask you to tape
-a film over a flat screen before the camera can see the laser at all. The largest
-system in the category states it plainly in its own TV setup guide: *"Use with TV
-or monitor will require our filter material that is taped to the screen in order
-to track the laser"*, and explains why — *"Some TVs will only reflect the laser at
-an angle incident to the angle the laser enters the screen. Therefore the camera
-will not be able to see the laser and track it."* A matte panel is the case where
-that is not true, which is why it is required here and why nothing goes on top of
-it. Checked against vendor documentation on 23 October 2026.
+### What is deliberately NOT claimed
 
-The app finds your shot by watching the screen for the laser spot, and it can only
-see that spot if the screen scatters some of the beam back toward the camera. A
-matte screen is micro-textured and throws light in every direction at once, so the
-spot is visible from almost any angle — which is the whole reason an ordinary
-webcam parked off to one side works at all. A glossy screen behaves like a mirror:
-shoot it at an angle and most of the beam leaves at the matching angle on the far
-side, away from the camera, while an anti-reflection coating weakens what little
-comes back and the panel's own layers absorb much of the rest.
+Two adversarial reviews were commissioned on 2026-10-23 and told to *disprove* a
+list of capability claims rather than confirm them. **They found predecessors, so
+no "first" and no "only" is claimed anywhere in this project.**
 
-So a glossy screen often registers hits fired square on and misses most of those
-fired from an angle, and **moving the camera does not fix it**: the mirror
-direction depends on where the shot landed, so it changes with every shot and no
-fixed camera position can follow it.
+Three claims are settled against us by both reviews independently, and are never
+asserted here in any form: the display being the target surface, an off-axis
+camera with a software-measured mapping, and two shooters on one shared screen
+have all been done before. Prior work worth knowing about:
 
-| Display | Status |
+- **Electron** (electrontir.ru) — a camera-based interactive range that
+  specifies a matte LED monitor and advertises simultaneous independent lanes.
+- **Laserboard** ([Ben-Kaniobi/Laserboard](https://github.com/Ben-Kaniobi/Laserboard))
+  — an external camera detecting a laser on a normal monitor, with automatic
+  perspective calibration.
+- **opendryfire** — an OpenCV homography for deliberately oblique camera
+  placement, onto printed targets.
+
+Several other claims came back *supported* in one review and *insufficient* in
+the other. The brief's own tie-break resolves a disagreement to the negative
+until the counterexample has been opened and read by hand, and nobody has done
+that yet; one review also states that it is interim and that two named patents
+were never examined. So the position is stated in the reviewers' words rather
+than ours:
+
+> "This review did not verify another implementation combining all of these
+> features, but it did identify predecessors for several individual
+> capabilities and did not establish a historical first."
+
+### What the nearest products require, that this does not
+
+This comparison holds up without any claim about novelty. Provenance, stated
+rather than implied: the first two rows are quoted from the vendors' own setup
+documentation in the reviews; the rest are published vendor statements as
+recorded in those reviews, not read by us from the primary page.
+
+| Product | What it needs for a flat screen |
 |---|---|
-| Matte / anti-glare computer monitor | Supported |
-| Glossy or semi-gloss monitor | Not supported |
-| Glossy TV — most LCD, QLED and OLED sets | Not supported |
-| Projector and screen | Not supported in v1 |
+| **Laser Ammo Smokeless Range** | A proprietary tracking camera, and for a TV, a sheet of GAMFusion 10‑55 diffusion film laid across the panel. |
+| **iFightBack** | Reflective cling film applied to the screen. |
+| **ShootOFF** (dormant since ~2021) | Sheer fabric or projection cloth stretched over the glass. |
+| **Tiradot** | A projector; TV support listed as "in development". |
+| **LASR / LASR‑X, Strikeman, Mantis** | A paper target, a wall, or a phone screen. |
 
-The projector is the one entry there that is not about gloss. A projection screen
-is diffuse and scatters the dot perfectly well; the obstacle is the palette. The
-app draws light grey on black, and a projector makes black by projecting nothing,
-so the dark parts of the picture are whatever the room does to a white screen.
-Making it work means inverting the whole scheme — dark targets on a lit field —
-and with it every brightness rule derived from the present one. That is a
-different app rather than a setting, and it is not in version 1.
+Here: an unmodified matte panel, nothing laid over it, an ordinary webcam off to
+one side.
 
-| Tested | Finish | Result |
-|---|---|---|
-| Dell UltraSharp U4320Q, 43" 4K | Matte | Hits visible at every angle tried |
-| Samsung 75" QLED, 2019 Q7 series | Glossy, anti-reflective | Sometimes visible head-on, mostly invisible at an angle |
+### The finding that shaped the engineering
 
-**To check yours:** turn it off and stand with a lamp or window behind you. A
-sharp, mirror-like reflection means glossy; a blurred, diffuse glow means matte.
-In the specifications, "anti-glare", "matte" or "3H anti-glare coating" is what
-you want, and "glossy", "glare type" or "anti-reflection glass" is what you do
-not.
-
-The app's self check (**C**) draws a dozen red dots at known places, photographs
-them and reports how many it found and how far out it placed them. Read it
-carefully: the **position error** is real, but the **detection rate is not your
-pistol's** — a screen emits its own test dot while a laser reflects off the
-coating, and the two fall off across a screen quite differently. The honest test
-of a doubtful screen is a magazine of real shots from where you intend to stand.
+Three competitive-landscape reports from 2026-10-18 agree on one thing that
+matters more than any feature: the dominant reason people abandon this category
+is **not** thin content — it is setup friction and unreliable detection. Users
+keep the laser cartridge and drop the app. That is why most of the work here went
+into a launch that ends in READY in about thirty seconds, or tells you exactly
+what to fix.
 
 ---
 
-## Setup
+## How it works
+
+### The dot
+
+A LaserLyte LT‑TTL trainer emits roughly **100 ms of 650 nm red** per trigger
+pull, about 5 mW, Class IIIa. It will not harm an LCD.
+
+### Why the panel has to be matte
+
+A **matte** anti-glare coating scatters the dot diffusely, so it can be seen from
+well off to one side. A **glossy** panel reflects it specularly, away from the
+camera, in a direction that changes with every shot position — so no camera
+placement can follow it.
+
+**A matte, anti-glare monitor — not glossy, not a television.** The measurements
+behind that, including the glossy panel this was tried on and failed, are
+[chapter 1 of the guide](manual/chapters/01-the-screen-it-needs.md).
+
+### Why 60 frames per second
+
+100 ms at 60 fps puts the pulse in **about six camera frames**. That is what makes
+the whole thing feasible: a shot is confirmed from several frames rather than one,
+so a single bright frame of noise is not a hit, the position can be averaged, and
+two shots can be told apart. At 30 fps the same pulse lands in three frames and
+the margin disappears.
+
+### What "seeing the dot" actually means
+
+The detector does not look for *bright*. It looks for **red in excess of the other
+channels** — `red − max(green, blue)` — which a 650 nm dot produces overwhelmingly
+and a grey target does not produce at all.
+
+Two consequences run through the entire app, and explain things that otherwise
+look arbitrary:
+
+- **Nothing drawn on the target screen may be red**, because the camera cannot
+  tell the app's own artwork from a laser. Everything is neutral grey, and the
+  tests measure red excess per pixel on rendered frames rather than trusting the
+  palette.
+- **Nothing drawn may be too bright either.** A dot landing on a lit grey target
+  scores *lower*, because red saturates while green and blue are already high.
+  Measured: the same dot scores 245 on near-black and 55 on grey at luminance 200.
+  So every target is capped at the brightness of the darkest supplied artwork.
+  That is why the whole game is grey and dim; [chapter 0](manual/chapters/00-what-it-is.md)
+  puts it in the shooter's terms.
+
+### Where the shot landed
+
+The camera sees the screen as a trapezoid, so the app fits a **homography** —
+exact for a flat screen viewed from any angle — plus **one radial lens term**,
+because a wide-angle webcam is not a pinhole. The fit is measured, never assumed:
+the app photographs its own markers at known screen positions, lit and unlit, and
+subtracts. Twelve markers fit the mapping and six more, at positions in between,
+are held back to measure it. **Held-out error is the number that is reported**,
+typically well under a millimetre, because an error measured against the points it
+was fitted to flatters any model.
+
+### Why the far side of the screen is harder
+
+Viewed from an angle, the far side of the panel is further away *and* at a steeper
+angle, so the dot is both dimmer and spread over roughly six times fewer camera
+pixels. Measured on one session: mean peak 62 in the centre against 34 at the far
+edge. A single threshold cannot serve both ends, so the app learns a **per-region
+sensitivity map from real shots** and normalises the score, which is also why the
+app gets better at the far corner the more it is used.
+
+### Testing itself before you fire
+
+The screen can test the camera, which is how the app knows it is working before
+a trigger is pulled: it draws its own red dots at known positions, at the
+brightness of real recorded hits, photographs them through the same camera and
+the same mapping your shots use, and reports READY or the specific reason not.
+
+**Read that number with one caveat, or it misleads.** A screen *emits* its test
+dot while a laser *reflects* off the panel's coating, and the two fall off across
+a screen quite differently — measured here, the synthetic dot held roughly steady
+from side to side while a real laser dropped by half. So the **position error is
+real**, because it is measured through the same mapping your shots are; the
+**detection rate is not your pistol's**. It proves the app can see dots on your
+screen and place them accurately. It cannot tell you what fraction of your
+trigger pulls will register.
+
+### Hearing the gun
+
+The camera's microphone is an independent channel. It answers a question the
+camera cannot: *did a trigger pull happen at all?* Heard and seen means working;
+heard but not seen means a shot was missed; seen but not heard is a phantom.
+**Audio never creates a hit** — it has no position, and somewhere is the one thing
+it cannot know.
+
+---
+
+## What you need
+
+| | |
+|---|---|
+| **Display** | A **matte** monitor. Glossy panels and projectors are not supported. |
+| **Camera** | Any USB webcam that does **60 fps** over MSMF. Developed against a Razer Kiyo Pro; a C920 works at 30 fps with less margin. |
+| **Laser** | A visible red (650 nm) laser trainer cartridge or trainer pistol. Two are supported at once. |
+| **Room** | Whatever you have. The app measures the room it is in and sets its own exposure from that measurement; it does not ask you to change the lighting. |
+| **OS** | Windows. Python 3.13 if you run from source. |
+
+The camera goes **beside, above or below the monitor**, angled at it — not in
+front of it, and not downrange. It must see all four corners of the screen.
+
+## Running it
+
+From a release (no Python needed): unzip and run **`Play.cmd`**. `Doctor.cmd`
+checks the camera and writes a report you can read or send on.
+
+From source:
 
 ```bat
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements\requirements.txt
+python -m venv app\.venv
+app\.venv\Scripts\python.exe -m pip install -r app\requirements.txt
+app\scripts\Play.cmd
 ```
 
-Then:
-
-```bat
-run_camera_lab.bat
-```
-
-## First run, in order
-
-Work down the numbered panels on the right. They are in this order for a reason.
-
-**1 — Which camera?**
-Click *Which camera?*. It grabs one still from each camera so you can see which
-one is pointed at the monitor. Note its index, pick it in *Device*, press
-*Connect*. Leave the defaults: **MSMF**, 1280×720, MJPG, 30 fps.
-
-> **Do not switch the backend to DSHOW on a C920.** Measured: DirectShow ignores
-> the MJPG request, forces YUY2 and delivers 10 fps. That is below the floor the
-> detector needs — a 100 ms pulse would land in a single frame. The app warns you
-> if the delivered rate drops under 20.
-
-If the resolution or codec you asked for is not what you got, the log says so.
-*Scan formats…* opens each candidate format in turn and **times real frame
-delivery** — the MEASURED column is the only one worth believing, because a
-webcam that reports 30 fps and delivers 5 is a common and silent failure.
-
-**2 — Exposure.**
-Click *Probe controls* first. It nudges every control, reads it back, and greys
-out the ones the driver ignores. Then click **Laser hunt (dark)**. The preview
-should go almost black — that is correct and is the entire trick: with the
-screen underexposed to a ghost, the laser is the only thing bright enough to
-register. If exposure refuses to stick, use *Driver dialog…* to open Logitech's
-own property sheet, which can set things OpenCV's pass-through sometimes cannot.
-
-**3 — Detector.**
-Click **Measure noise floor (3 s)** first, and do not fire while it runs. It
-finds the brightest thing the detector sees with no laser present and sets the
-threshold above it. Guessing that number is what produces shots you never fired.
-
-Keep **Laser-safe preview (blue)** ticked. The preview shows the camera feed on
-the same monitor the camera is watching, which is an infinite mirror — the laser
-dot recurses inside it and every reflection looks like a real hit. Rendering the
-preview multiplied by blue zeroes the red channel so it cannot register.
-
-Then leave the rest alone at first. Fire at the screen and watch the preview. A green
-crosshair should snap onto the dot. Tick *Show mask* to see exactly what the
-detector sees. If nothing is found, lower *Threshold* and *Min peak*. If
-everything is found, raise them.
-
-**4 — Shot tracking.**
-`Min frames per shot = 2` is the useful default: a 100 ms LaserLyte pulse spans
-about three frames at 30 fps, so demanding two throws away single-frame sensor
-noise for free.
-
-**5 — Target screen (F11).**
-Fullscreen aiming field with a scoreboard, for actually standing back and
-shooting. Keys on that screen:
-
-| Key | Does |
-|---|---|
-| `P` | camera pane on/off |
-| `S` | stats panel on/off |
-| `A` | aim marks on/off |
-| `I` | detector diagnostics on/off |
-| `H` | key help on/off |
-| `D` `W` `R` `G` | background: dark / white / red / grey |
-| `C` | clear hit markers |
-| `M` `[` `]` | move / resize the camera pane |
-| `Esc` | back to the lab |
-
-`W` and `R` are stress tests, not decoration. White is the hardest background
-for any detector; red is the hardest specifically for the chroma detector. If
-detection survives both, your room and your target art will not trouble it.
-
-**6 — Hit-rate test.** The number that decides the project. Press *Reset
-counters*, go to the target screen, fire a known number of shots, come back and
-type how many you fired. Anything under 95% means more tuning.
-
-**7 — Recording.** Saves video, a per-frame detection CSV and every setting, so
-detection can be retuned offline against your real room instead of you standing
-there shooting while someone guesses.
-
----
-
-## Camera placement
-
-The camera does not need to be square-on to the screen; an angle is expected and
-fine. Because the laser lands on the actual screen pixel there is no parallax
-error, and a homography describes an oblique view of a flat screen exactly.
-
-Two things to keep in mind. Past roughly 45° the far side of the screen gets few
-enough camera pixels that accuracy suffers. And the camera must see all four
-corners of the monitor — calibration needs them.
+Close it with **Escape** or the Exit tile — never End Task. A force-killed app can
+leave the camera needing a physical replug, and `app\scripts\stop_lab.ps1` exists
+to close it the way the app would.
 
 ## Tests
 
@@ -184,36 +240,16 @@ corners of the monitor — calibration needs them.
 app\scripts\run_tests.bat
 ```
 
-Neither suite needs a camera or a display. `test_detector.py` plays synthetic
-100 ms pulses through the real pipeline — including two guns fired at once, two
-guns offset in time, rapid fire at one spot, and an off-axis elliptical dot.
-`test_ui_smoke.py` builds the entire UI headless and renders the target screen
-to `target_screen.png`, checking among other things that nothing drawn on it is
-red enough for the camera to mistake for a laser.
+Twenty-six suites, no camera and no display needed — they run offscreen with the
+camera disabled. Alongside them are six **mutation runners**, which put known
+faults back into the code on purpose and fail the build unless the check written
+for each one goes red. A check that cannot fail is not a check, and this project
+has shipped several; that is what those runners are for.
 
-## If you cannot hear the gunshot
-
-**Check the Windows volume mixer before anything else.** Windows keeps a volume
-per application *per output device*, identifies the application by its
-executable path, and can set it silently. A virtual environment you build
-yourself therefore gets its own entry, and raising it for one Python does not
-cover the next one you create.
-
-This cost three days on this project. The app opened the correct device, loaded
-the correct sample, and wrote `gunshot ... played on <device>` in its log, while
-the slider for `pythonw.exe` sat at 0%. Every symptom pointed at the app: no
-bang, the microphone never learned to tell our gunshot from yours, and the shot
-counter reported trigger pulls as "heard but not seen".
-
-    Right-click the speaker in the tray -> Open volume mixer
-    -> find python.exe / pythonw.exe (or screenplink.exe) -> raise it
-
-The mixer only lists an application while it is running, so start the app first.
-The app reports what it finds and never changes it. `app\tools\audio_meter.py`
-prints the volume Windows has stored for every entry it remembers about us,
-including applications that are not currently running.
+`app\tests\test_coldstart.py` drives the whole startup chain against a simulated
+camera, seven launches end to end. It is the one that finds the faults that matter.
 
 ## Safety
 
-The LaserLyte trainers are 5 mW Class IIIa. They will not harm an LCD. Do not
-look into the muzzle.
+The LaserLyte trainers are 5 mW Class IIIa. They will not harm an LCD. **Do not
+look into the muzzle.** Clear the firearm; this is dry-fire practice.

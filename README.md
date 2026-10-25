@@ -13,8 +13,21 @@ hardware and can control the lighting: a games room, a basement, a bar. The
 lighting is the real constraint rather than the space. You are not asked to sit
 in the dark, but a room you can dim is a room this works better in.
 
-> 🎬 **[Short trailer: what it is](https://youtu.be/tg2Bt8K5IE0)**
-> 🔬 **[Concepts: how it actually works](https://youtu.be/pIdJhRYK-Bw)**
+<p align="center">
+  <a href="https://youtu.be/tg2Bt8K5IE0" target="_blank" rel="noopener">
+    <img src="media/trailer-thumb.jpg" width="900"
+         alt="Watch the trailer: two laser pistols shooting figures on a monitor">
+  </a>
+</p>
+
+<h3 align="center">
+  🎬 <a href="https://youtu.be/tg2Bt8K5IE0" target="_blank" rel="noopener">Watch the trailer</a>
+  &nbsp;&nbsp;&nbsp;
+  🔬 <a href="https://youtu.be/pIdJhRYK-Bw" target="_blank" rel="noopener">How it actually works</a>
+</h3>
+
+<p align="center"><i>The trailer is what it is. The second one is the physics:
+why the monitor has to be matte, and why an ordinary webcam is enough.</i></p>
 
 ---
 
@@ -119,7 +132,10 @@ scatters the dot, so a camera off to one side can see it. Glossy glass reflects
 it away instead, in a direction that changes with every shot, so no camera
 placement can follow.
 
-🔬 The full explanation is a short video: **[Concepts: how it actually works](https://youtu.be/pIdJhRYK-Bw)**
+<p align="center">
+  🔬 <b><a href="https://youtu.be/pIdJhRYK-Bw" target="_blank" rel="noopener">
+  The full explanation is a short video</a></b>
+</p>
 
 ## If you are building something like this
 

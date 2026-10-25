@@ -297,7 +297,25 @@ class OwnedFiles:
         # nothing. That is exactly how this module protected nothing for two
         # days after the files moved into `config/`. Record the absences at
         # construction so `check()` can refuse rather than agree with itself.
-        self.absent = tuple(n for n in names if not path_of(n).exists())
+        missing = tuple(n for n in names if not path_of(n).exists())
+        # ...but there is a THIRD state, and conflating it with the other two
+        # fails 11 suites on a machine that has done nothing wrong. The two
+        # `config/` entries are gitignored and WRITTEN BY THE APP AT RUNTIME,
+        # so on a fresh clone they have never existed. Found on 2026-10-25 by
+        # cloning the public repository and running the suite as a contributor
+        # would: every failure traced here, and the README asks contributors to
+        # run the suite before opening a pull request.
+        #
+        # The discriminator is the FOLDER, not the file. No `config/` directory
+        # at all means the app has never run on this machine, so there is
+        # nothing of anyone's to protect. A `config/` that exists with a named
+        # file missing is the stale path this module was written for, and still
+        # fails. Anything under `resources/` is tracked in git and must always
+        # be there, so its absence is a failure either way.
+        never_run = not (ROOT / 'config').is_dir()
+        self.unwritten = tuple(n for n in missing
+                               if never_run and n.startswith('config/'))
+        self.absent = tuple(n for n in missing if n not in self.unwritten)
 
     def changed(self) -> list[str]:
         """Which of them differ from when this object was made.
@@ -342,6 +360,14 @@ class OwnedFiles:
               f"test did. Either the path is stale (the usual cause: a file "
               f"moved and this list did not) or the file is genuinely absent "
               f"on this machine. Fix the path; do not delete the name.")
+        # A visible skip, never a silent one: the point of this module is that
+        # nothing it does may be invisible. If this line ever appears on a
+        # machine that HAS run the app, the folder check above is wrong.
+        if self.unwritten:
+            check(True,
+                  'the user has no measured files here yet, so there are none to protect',
+                  f'{list(self.unwritten)} are written by the app at runtime and this machine has no app/config at all, so it has never run here. On a machine that HAS run, a missing name fails above instead.')
+
         bad = self.changed()
         check(not bad,
               "the files the user owns are byte-for-byte unchanged",

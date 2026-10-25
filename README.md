@@ -13,8 +13,8 @@ hardware and can control the lighting: a games room, a basement, a bar. The
 lighting is the real constraint rather than the space. You are not asked to sit
 in the dark, but a room you can dim is a room this works better in.
 
-> 🎬 **Short trailer to understand what it is** - *(link coming)*
-> 🔬 **Recap of how it actually works** - *(link coming)*
+> 🎬 **[Short trailer: what it is](https://youtu.be/tg2Bt8K5IE0)**
+> 🔬 **[Concepts: how it actually works](https://youtu.be/pIdJhRYK-Bw)**
 
 ---
 
@@ -119,7 +119,7 @@ scatters the dot, so a camera off to one side can see it. Glossy glass reflects
 it away instead, in a direction that changes with every shot, so no camera
 placement can follow.
 
-🔬 The full explanation is a short video: *(link coming)*
+🔬 The full explanation is a short video: **[Concepts: how it actually works](https://youtu.be/pIdJhRYK-Bw)**
 
 ## If you are building something like this
 

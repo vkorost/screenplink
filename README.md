@@ -152,9 +152,17 @@ placement can follow.
 
 ## If you are building something like this
 
-Two weeks of building this produced a long list of mistakes, and I wrote them
-down as I went: **[Lessons learned](LESSONS-LEARNED.md)**. Twenty of them, each
-with the measurement that caused it.
+The whole thing was written by [Claude Code](https://claude.com/claude-code)
+over about two weeks. I directed it, shot at it, and decided what was
+acceptable, but I did not write the implementation.
+
+**[Built with Claude Code](BUILT-WITH-CLAUDE.md)** is the index to how that
+worked: giving an agent an instrument instead of a log, making tests that can
+actually fail, and gating the word "ready". It links everything else worth
+reading.
+
+The file underneath it is **[Lessons learned](LESSONS-LEARNED.md)**: twenty
+findings, each with the measurement that caused it.
 
 I am putting it in front of you because almost none of it is about lasers. It is
 about the things that go wrong when a program has to measure the physical world
@@ -184,6 +192,7 @@ find. There is nothing personal in that file and nothing specific to my setup.
 | 📖 **[User Guide](manual/README.md)** | Thirteen chapters: the screen it needs, setup, the nine drills, the magazine, the score, two players and every key. PDF and EPUB included |
 | 🔧 **[Troubleshooting](TROUBLESHOOTING.md)** | When the app does not work. Start at the top: the most common fault is not in this app at all |
 | 🗺️ **[Project layout](PROJECT-LAYOUT.md)** | Every folder, for anyone changing the code |
+| 🤖 **[Built with Claude Code](BUILT-WITH-CLAUDE.md)** | How an agent developed and debugged a program that measures the physical world, when it cannot see the monitor or pull the trigger. The index to everything below |
 | 🧭 **[Lessons learned](LESSONS-LEARNED.md)** | Twenty things this project got wrong and what each one cost. Mostly not about lasers: measuring the wrong quantity, checks that could not fail, a cleanup that only worked by accident, a note that stopped being true |
 | 🤖 **[Asking the app what it sees](MCP.md)** | The app answers questions about itself while it runs, over MCP or plain HTTP: what the detector scored, what is painted, what it measured and why. Measurements, never conclusions |
 | 📕 **[Laser Training for Home Shooters][book]** | A Q4 2026 book on the laser dry-fire category: the apps, the targets, the sensors, the scoring and the failure modes. Built from a few AI deep-research reports over vendor documentation and owner reports, with nothing in it bought or borrowed. It is not about this project. It is a survey of dry laser shooting that I built for myself, to understand the landscape and to check whether what I was about to build already existed in some shape or form |

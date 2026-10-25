@@ -201,7 +201,7 @@ does.
 
 **For pull requests:** the full test suite ships with the release and with the
 repository, needs no camera and no screen, and runs with
-`app\scriptsun_tests.bat`. Please run it. And read
+`app\scripts\run_tests.bat`. Please run it. And read
 [LESSONS-LEARNED.md](LESSONS-LEARNED.md) first, because several of the things
 that look like dead weight in this codebase are load-bearing for reasons that
 cost days to find.

@@ -26,6 +26,11 @@ in the dark, but a room you can dim is a room this works better in.
   🔬 <a href="https://youtu.be/pIdJhRYK-Bw" target="_blank" rel="noopener">How it actually works</a>
 </h3>
 
+<p align="center">
+  <a href="https://github.com/vkorost/screenplink/releases/latest"><b>&#11015;&nbsp; Download for Windows</b></a>
+  &nbsp;&nbsp;v1.0.0, 230&nbsp;MB, no Python needed
+</p>
+
 <p align="center"><i>The trailer is what it is. The second one is the physics:
 why the monitor has to be matte, and why an ordinary webcam is enough.</i></p>
 
@@ -92,8 +97,13 @@ more to this project than any feature.
 
 ## Get it
 
-You can either clone the repo to your local drive or you can just download the release, unzip it, run **`Play.cmd`**. 
-`Doctor.cmd` checks your camera and writes a report.
+**[Download the latest release](https://github.com/vkorost/screenplink/releases/latest)**, unzip it anywhere, and run
+**`Play.cmd`**. That is the whole installation: no Python, no dependencies, no
+installer. Windows only for now.
+
+Run **`Doctor.cmd`** first if you want to know which of your cameras is fit for
+this before you start. It tests every one it finds and writes
+`doctor-report.txt` beside itself.
 
 **Or do not set it up at all: ask Claude Code to.** Unzip the release, open the
 folder with [Claude Code](https://claude.com/claude-code), and ask it to set up
@@ -106,7 +116,8 @@ which one physical thing is in the way.
 
 This is how the author sets it up now. See [Asking the app what it sees](MCP.md).
 
-From source:
+If you would rather run from source, or you are on a machine where you build
+your own things:
 
 ```bat
 python -m venv app\.venv

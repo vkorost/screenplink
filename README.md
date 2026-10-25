@@ -86,7 +86,9 @@ panel may scatter the dot differently, and you may meet something I never did.
 
 That is what [TROUBLESHOOTING.md](TROUBLESHOOTING.md) is for. It is written from
 the faults this hardware actually produced, and it lists the numbers a healthy
-setup gives, so you can tell how far yours is from working.
+setup gives, so you can tell how far yours is from working. If you hit
+something that is not in it, open an issue: numbers from a second rig are worth
+more to this project than any feature.
 
 ## Get it
 
@@ -174,6 +176,35 @@ find. There is nothing personal in that file and nothing specific to my setup.
 | 🧭 **[Lessons learned](LESSONS-LEARNED.md)** | Twenty things this project got wrong and what each one cost. Mostly not about lasers: measuring the wrong quantity, checks that could not fail, a cleanup that only worked by accident, a note that stopped being true |
 | 🤖 **[Asking the app what it sees](MCP.md)** | The app answers questions about itself while it runs, over MCP or plain HTTP: what the detector scored, what is painted, what it measured and why. Measurements, never conclusions |
 | 📕 **[Laser Training for Home Shooters][book]** | A Q4 2026 book on the laser dry-fire category: the apps, the targets, the sensors, the scoring and the failure modes. Built from a few AI deep-research reports over vendor documentation and owner reports, with nothing in it bought or borrowed. It is not about this project. It is a survey of dry laser shooting that I built for myself, to understand the landscape and to check whether what I was about to build already existed in some shape or form |
+
+## Issues and pull requests
+
+Both are open.
+
+Setting expectations honestly: this is one person's side project, built in two
+weeks against one monitor and one webcam. There is no support commitment and no
+promise about response times. What there is, is an app that measures everything
+it does and writes it down, so a problem can usually be diagnosed from a file
+rather than from a conversation.
+
+**If something does not work**, the two files that answer most questions are
+`app\logs\camera_lab.log` (one `GATE` line per launch, carrying the verdict,
+the calibration error, the frame rate, the noise floor and the detection bar)
+and the `doctor-report.txt` that `Doctor.cmd` writes. Paste those rather than
+describing the symptom. [TROUBLESHOOTING.md](TROUBLESHOOTING.md) explains what
+each number means and what a healthy one looks like.
+
+**The most useful thing anyone can send is a second rig.** A different panel, a
+different camera, a different room. Everything here was measured on one setup,
+and the honest limit of this project is that nobody knows what the second one
+does.
+
+**For pull requests:** the full test suite ships with the release and with the
+repository, needs no camera and no screen, and runs with
+`app\scriptsun_tests.bat`. Please run it. And read
+[LESSONS-LEARNED.md](LESSONS-LEARNED.md) first, because several of the things
+that look like dead weight in this codebase are load-bearing for reasons that
+cost days to find.
 
 ## Credits, and what is actually mine
 

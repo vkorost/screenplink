@@ -40,6 +40,7 @@ Pressing a drill's own key again starts a new round of it.
 | **A** | Self-check |
 | **Q** | Show the last verdict |
 | **G** | Calibrate by shooting a grid |
+| **U** | Calibrate the brightness by shooting |
 | **X** | Measure the exposure |
 | **F** | Measure the noise floor |
 

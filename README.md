@@ -8,10 +8,17 @@ plays the shot. Targets fall, scores count, the gun's magazine runs dry.
 
 Full source code included with the build. Free, offline, no account, no ads. Version 1.0 works on Windows only. Feel free to clone and make it work for Mac if you feel like it.
 
-It is an ideal addition to a man cave, and it works anywhere you have the
-hardware and can control the lighting: a games room, a basement, a bar. The
-lighting is the real constraint rather than the space. You are not asked to sit
-in the dark, but a room you can dim is a room this works better in.
+**Three places I think this belongs.** A man cave or a games room, obviously.
+But also a **gun shop**, where a corner of the floor lets a customer put real
+trigger pulls through their own gun with a laser cartridge, which beats a dry
+click and a nod. And a **bar**, next to the darts. The licence is Apache-2.0, so
+commercial use is fine and you owe me nothing.
+
+**The constraint is light, not space.** You need a corner where you can bring
+the light down enough for the camera to see the dot, and then keep it there.
+Not darkness: you still want to see your sights. A dimmable corner beats a
+bright showroom every time, and constant beats bright. Past that it is a matte
+monitor, a Windows PC and a webcam that does 60 fps.
 
 <p align="center">
   <a href="https://youtu.be/tg2Bt8K5IE0" target="_blank" rel="noopener">
@@ -33,6 +40,17 @@ in the dark, but a room you can dim is a room this works better in.
 
 <p align="center"><i>The trailer is what it is. The second one is the physics:
 why the monitor has to be matte, and why an ordinary webcam is enough.</i></p>
+
+### If you set this up, I would like to see it
+
+Especially in a shop or a bar. Tell me what hardware you used, what broke, and
+what people asked for, and send pictures or video of it running. I am genuinely
+collecting this: one monitor and one webcam is the honest limit of everything
+here, and footage from somebody else's corner is worth more to me than any
+feature. If shops or bars find it useful, I will build the next version with
+them in mind.
+
+Find me here: **[linktr.ee/vkorost](https://linktr.ee/vkorost)**
 
 ---
 

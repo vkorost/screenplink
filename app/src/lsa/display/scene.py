@@ -90,6 +90,13 @@ class RenderContext:
     # the way: during calibration there is exactly one thing to do, and a ring
     # that has to be picked out from behind a scoreboard is a ring that gets
     # shot at inaccurately.
+    # HOW LATE A SHOT'S TIMESTAMP IS beyond what the app can observe: the
+    # display latency plus the camera pipeline, both of which happened before
+    # `cap.read()` returned. A moving target's hit test adds this to the age it
+    # can see (`Mode.shot_age`). ZERO here on purpose -- a context built by a
+    # test or by any other caller behaves exactly as it did before this field
+    # existed, and only the live Scene is handed the measured value.
+    shot_pipeline_lag_s: float = 0.0
     calibrating: bool = False
     # A measured camera-to-screen mapping exists, so a shot can be drawn where
     # it actually landed. Layers that only make sense BEFORE that -- the
@@ -248,6 +255,9 @@ class Scene:
         # The app's player-count setting, mirrored here by the app and copied
         # into every RenderContext, like `calibrated`.
         self.players = 1
+        # Handed in by the app from settings (`AppSettings.pipeline_lag_s`).
+        # Zero until then, which is the behaviour this field replaced.
+        self.shot_pipeline_lag_s = 0.0
         self.dark_background = True
 
     # -- composition ----------------------------------------------------------
@@ -361,4 +371,5 @@ class Scene:
             calibrating=self.calibrating,
             calibrated=self.calibrated,
             players=self.players,
+            shot_pipeline_lag_s=self.shot_pipeline_lag_s,
         )

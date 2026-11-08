@@ -545,6 +545,10 @@ def _flash_dot(lab: Any, point: tuple[float, float], radius: float,
     yield Call(lambda: lab._selftest_arm())
     yield Call(lambda: _show_dot_at(lab, point, radius, brightness))
     yield Paint()
+    # The app's last word before the photons leave. Everything between this
+    # and the detection's timestamp is the display and the camera, which is
+    # exactly what the ball's hit test does not rewind for.
+    yield Call(lambda: lab._selftest_mark_paint())
     # A LaserLyte pulse is ~100ms, so the dot is held for about as long and
     # the tracker sees a comparable number of frames.
     yield Sleep(lab.SELFTEST_HOLD_MS)
@@ -553,6 +557,7 @@ def _flash_dot(lab: Any, point: tuple[float, float], radius: float,
     # Let the tracker close the shot and the scene settle, or two dots
     # merge into one track.
     yield Sleep(lab.SELFTEST_GAP_MS)
+    yield Call(lambda: lab._selftest_note_latency())
     return lab._selftest_seen
 
 
@@ -697,6 +702,7 @@ def self_test(lab: Any, rounds: int = 1) -> Generator:
             results.append((point, seen))
             yield Log(lab._selftest_line(i, len(points), point, seen, bright))
 
+        yield Log(lab._selftest_latency_line())
         yield Call(lambda: lab._selftest_report(results, rej_before))
         return results
     finally:

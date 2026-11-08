@@ -635,6 +635,51 @@ class Mode(Layer):
         """
         return None
 
+    def aim_measure(self, ev: ShotEvent, ctx: RenderContext):
+        """`(along, cross, speed)` for this shot against a MOVING target.
+
+        Measured against the SAME centre `shot()` tests, so what is reported
+        and what is learned from is what actually decided hit or miss. Called
+        BEFORE `shot()` for the same reason as `nearest`: a hit respawns the
+        target. None from any mode with no travelling target, which is most.
+
+        `along` is positive AHEAD of the tested centre in the direction of
+        travel, so a NEGATIVE median across many shots is the rewind that is
+        still missing.
+        """
+        return None
+
+    def aim_debug(self, ev: ShotEvent, ctx: RenderContext) -> "str | None":
+        """The log fragment for `aim_measure`. One definition for every mode,
+        so two of them cannot describe the same measurement differently."""
+        m = self.aim_measure(ev, ctx)
+        return None if m is None else self.aim_line(*m, self.shot_age(ev, ctx))
+
+    @staticmethod
+    def aim_offsets(ev: ShotEvent, cx: float, cy: float,
+                    vx: float, vy: float) -> "tuple[float, float, float] | None":
+        """`(along, cross, speed)` for a shot against a target at `(cx, cy)`
+        travelling at `(vx, vy)`. One definition, used by every mode that
+        reports an aim offset, so two of them cannot disagree about which
+        way `along` points. None when the target is not moving.
+
+        `along` is positive AHEAD of `(cx, cy)` in the direction of travel.
+        """
+        speed = math.hypot(vx, vy)
+        if speed <= 1e-6:
+            return None
+        ux, uy = vx / speed, vy / speed
+        dx, dy = ev.x - cx, ev.y - cy
+        return (dx * ux + dy * uy, -dx * uy + dy * ux, speed)
+
+    @staticmethod
+    def aim_line(along: float, cross: float, speed: float, age: float) -> str:
+        """The log fragment. Pure, so its wording is testable without an app."""
+        lead_ms = (-along / speed) * 1000.0 if speed > 1e-6 else 0.0
+        return (f"[aim: along {along:+.0f}px, cross {cross:+.0f}px, "
+                f"ball {speed:.0f}px/s, rewound {age * 1000.0:.0f}ms, "
+                f"implied extra rewind {lead_ms:+.0f}ms]")
+
     @staticmethod
     def closest(candidates: "list[NearestTarget]") -> "NearestTarget | None":
         """The candidate the shot is nearest to, by the gap to its scoring
@@ -663,8 +708,33 @@ class Mode(Layer):
         measured: a ball at 2 screen widths a second moves several radii in
         that time. The hit test must ask where the target WAS, not where it
         is drawn now. The drawn position and the physics are untouched.
+
+        TWO PARTS, and for a long time only the first was here.
+
+        `ctx.now - ev.t` is the part the app can observe: delivery from the
+        capture thread, and the frames the tracker needed to confirm. It
+        measures 20-30ms on his bench.
+
+        `ctx.shot_pipeline_lag_s` is the part it CANNOT observe, because it
+        happened before `ev.t` existed. `ev.t` is stamped when `cap.read()`
+        returns, so the display latency and the camera's exposure, encode,
+        transfer and decode all sit in front of it -- and the ball he aimed at
+        was on the glass before any of them. Leaving it out put the tested
+        centre AHEAD of the ball he shot at, which killed the trailing edge:
+        a shot on the back of the ball lands r + lag*speed from the tested
+        centre and scores a miss however cleanly it hit.
+
+        Measured 2026-11-08 from 68 of his scored shots: they landed a median
+        of 46.5px behind the tested centre along the ball's heading, at
+        680px/s, which is 67ms. The cross-track median was -2.5px, which is
+        what proves this is a timing error and not a mapping one.
+
+        Both are inside the one `MAX_REWIND_S` clamp, so a wrong lag can never
+        rewind further than a quarter second however it was arrived at.
         """
-        return min(cls.MAX_REWIND_S, max(0.0, ctx.now - ev.t))
+        seen = max(0.0, ctx.now - ev.t)
+        unseen = max(0.0, float(getattr(ctx, "shot_pipeline_lag_s", 0.0) or 0.0))
+        return min(cls.MAX_REWIND_S, seen + unseen)
 
     # A ball is drawn as an OUTLINE of this width, centred on its radius, so
     # the ball visibly extends half a stroke beyond `r`. The width is defined
@@ -1883,6 +1953,20 @@ class ModeHost(Layer):
         """`Mode.nearest` for whichever side the shot belongs to (log only)."""
         mode, sctx, _which = self._routed(ev.x, ctx)
         return mode.nearest(ev, sctx) if mode is not None else None
+
+    def aim_debug(self, ev: ShotEvent, ctx: RenderContext):
+        """`Mode.aim_debug` for whichever side the shot belongs to (log only).
+
+        Delegated the same way as `nearest`, through the same `_routed`, so
+        the offset is measured against the target the hit test will use.
+        """
+        mode, sctx, _which = self._routed(ev.x, ctx)
+        return mode.aim_debug(ev, sctx) if mode is not None else None
+
+    def aim_measure(self, ev: ShotEvent, ctx: RenderContext):
+        """`Mode.aim_measure` for whichever side the shot belongs to."""
+        mode, sctx, _which = self._routed(ev.x, ctx)
+        return mode.aim_measure(ev, sctx) if mode is not None else None
 
     # -- the world ------------------------------------------------------------
 

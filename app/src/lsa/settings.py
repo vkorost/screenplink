@@ -73,6 +73,33 @@ MAGAZINE_MAX = 50          # a rifle magazine; beyond it the strip is unreadable
 # keeps a number of its own. The FLOOR is not zero -- a drill at speed zero
 # has targets that never move, which is indistinguishable from a frozen app
 # and is the same trap as a volume key that can reach mute.
+# HOW LATE A SHOT'S TIMESTAMP IS, in seconds, beyond what the app can see.
+#
+# `ShotEvent.t` is stamped when `cap.read()` returns. The display latency and
+# the camera's own pipeline both happened BEFORE that, to a ball the shooter
+# had already aimed at, so a moving target's hit test must rewind by this much
+# again or the back of the target is dead (`Mode.shot_age`).
+#
+# The default is a typical webcam-and-LCD pipeline and is REPLACED by the first
+# measurement on this machine. The ceiling is deliberately well under
+# `Mode.MAX_REWIND_S`: beyond ~150ms this is not a pipeline latency any more,
+# it is a broken clock, and the hit test must not follow it there.
+PIPELINE_LAG_DEFAULT = 0.060
+PIPELINE_LAG_MIN = 0.0
+PIPELINE_LAG_MAX = 0.150
+
+
+def normalise_pipeline_lag(value: object) -> float:
+    """Clamp to a believable pipeline latency. Anything unreadable -> default."""
+    try:
+        v = float(value)      # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return PIPELINE_LAG_DEFAULT
+    if v != v:                # NaN
+        return PIPELINE_LAG_DEFAULT
+    return max(PIPELINE_LAG_MIN, min(PIPELINE_LAG_MAX, v))
+
+
 DEFAULT_SPEED = 1.0
 SPEED_MIN = 0.25
 SPEED_MAX = 3.0
@@ -263,9 +290,13 @@ class AppSettings:
     # A drill absent from this dict runs at DEFAULT_SPEED, so a fresh install
     # and a drill added next year both behave without an entry existing.
     mode_speed: dict[str, float] = field(default_factory=dict)
+    # Measured on this machine from real shots at moving targets. See
+    # PIPELINE_LAG_DEFAULT above.
+    pipeline_lag_s: float = PIPELINE_LAG_DEFAULT
 
     def __post_init__(self) -> None:
         self.bests = normalise_bests(self.bests)
+        self.pipeline_lag_s = normalise_pipeline_lag(self.pipeline_lag_s)
         self.mode_speed = normalise_mode_speed(self.mode_speed)
 
     def speed_for(self, name: str) -> float:

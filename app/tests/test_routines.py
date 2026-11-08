@@ -73,6 +73,11 @@ class StubMapping:
         return True
 
 
+import io as _io_stub
+import re as _re_stub
+import time as _time_stub
+
+
 class StubLab:
     """Answers what the self test asks, and records what it was told.
 
@@ -108,6 +113,11 @@ class StubLab:
         self.dot_up = False
         self.dot_down_count = 0
         self._selftest_seen = None
+        # The paint-to-detection latency probe (2026-11-08). Declared and
+        # assigned, never reached for with getattr (C8).
+        self._selftest_seen_t = None
+        self._selftest_paint_t = None
+        self.latencies: list[float] = []
         self._points = [(100.0 * (i + 1), 200.0) for i in range(points)]
 
     # -- what the routine reads --------------------------------------------
@@ -128,6 +138,27 @@ class StubLab:
 
     def _selftest_arm(self):
         self._selftest_seen = None
+        self._selftest_seen_t = None
+        self._selftest_paint_t = None
+
+    # Mirrors the real CameraLab: the routine marks when the dot's paint
+    # finished, files the gap to the detection, and reports what it measured.
+    # This stub never sets `_selftest_seen_t`, so the line correctly reports
+    # NOT MEASURED -- which is the branch that matters (C1).
+    def _selftest_mark_paint(self):
+        self._selftest_paint_t = _time_stub.perf_counter()
+
+    def _selftest_note_latency(self):
+        t0 = self._selftest_paint_t
+        t1 = self._selftest_seen_t
+        if t0 is None or t1 is None:
+            return
+        self.latencies.append((float(t1) - float(t0)) * 1000.0)
+
+    def _selftest_latency_line(self):
+        if not self.latencies:
+            return "  paint-to-detection latency: NOT MEASURED"
+        return f"  paint-to-detection latency over {len(self.latencies)} dots"
 
     def _selftest_line(self, i, total, want, got, bright):
         return f"  dot {i + 1}/{total}: {'seen' if got else 'NOT DETECTED'}"
@@ -215,6 +246,25 @@ section("1. the dot radius is saved only when a flash actually measured it")
 # while the detector got steadily worse at seeing an actual laser. Every other
 # instrument here -- the suite, the cold-start harness, the live gate --
 # measures detection, and all of them read BETTER as this fault progresses.
+
+# THE STUB MUST MIRROR THE APP, and that is checked rather than remembered.
+# Read every `lab.<method>(` the routines module calls out of its own source
+# and require the stand-in to have it. When `_flash_dot` grew two calls on
+# 2026-11-08 this suite died with a traceback from inside `drive()`; a missing
+# method should say its own name (C12, C17, and C1: assert the effect).
+# SCOPED TO WHAT THIS STUB STANDS IN FOR. routines.py holds the probe and the
+# calibration too, and those run against different stand-ins further down this
+# file; scanning the whole module demanded methods StubLab has no business
+# having. The source of the two functions it DOES drive is the right subject.
+import inspect as _inspect_stub
+_routines_src = "".join(_inspect_stub.getsource(f)
+                        for f in (routines.self_test, routines._flash_dot))
+_called = sorted(set(_re_stub.findall(r"lab\.(_[a-z_]+)\(", _routines_src)))
+_missing = [n for n in _called if not hasattr(StubLab, n)]
+check(not _missing,
+      "the routines stand-in has every lab method the routines actually call",
+      f"MISSING from StubLab: {_missing}" if _missing
+      else f"{len(_called)} methods, all present")
 
 lab = StubLab(vision=[None], remembered=63.0)
 drive(routines.self_test(lab), lab)

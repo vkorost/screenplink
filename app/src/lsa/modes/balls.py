@@ -256,6 +256,22 @@ class BouncingBalls(Mode):
                         self.ring_hit_radius(b.r)))
         return self.closest(out)
 
+    def aim_measure(self, ev: ShotEvent, ctx: RenderContext):
+        # Against the ball `nearest` names, chosen by the same `closest` rule,
+        # so the log cannot describe one ball and measure another.
+        age = self.shot_age(ev, ctx)
+        best = None
+        for b in self.balls:
+            bx, by = self._position_at(b, age, ctx)
+            d = math.hypot(ev.x - bx, ev.y - by)
+            edge = d - self.ring_hit_radius(b.r)
+            if best is None or edge < best[0]:
+                best = (edge, b, bx, by)
+        if best is None:
+            return None
+        _edge, b, bx, by = best
+        return self.aim_offsets(ev, bx, by, b.vx, b.vy)
+
     def shot(self, ev: ShotEvent, ctx: RenderContext) -> ShotOutcome:
         self.shots += 1
         # Nearest ball whose circle contains the shot. Nearest, not first:

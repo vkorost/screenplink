@@ -137,7 +137,8 @@ from lsa.display.foreground import force_to_front  # noqa: E402
 from lsa.display import power as display_power                    # noqa: E402
 from lsa.display.splash import Splash  # noqa: E402
 from lsa.display.window import TargetWindow                                   # noqa: E402
-from lsa.settings import AppSettings, normalise_magazine, normalise_players  # noqa: E402
+from lsa.settings import (AppSettings, normalise_magazine,  # noqa: E402
+                          normalise_pipeline_lag, normalise_players)
 from lsa.bests import BestBook                                                # noqa: E402
 from lsa.director import Director, QtClock                                     # noqa: E402
 from lsa import routines                                                       # noqa: E402
@@ -887,9 +888,23 @@ class CameraLab(QMainWindow):
         # answer is to measure, not to check again.
         self._check_tried = False
 
+        # HOW LATE A SHOT'S TIMESTAMP IS, learned from real shots at moving
+        # targets. See `_note_aim_residual`. Declared and assigned here
+        # rather than reached for with getattr (C8).
+        self._lag_samples: list = []
         # The screen-draws-a-red-dot self test. See `start_self_test`.
         self._selftest_results: list = []
         self._selftest_seen = None
+        # PAINT-TO-DETECTION LATENCY, measurement only (2026-11-08). The ball's
+        # hit test rewinds a moving target by `ctx.now - ev.t`, and `ev.t` is
+        # stamped when `cap.read()` RETURNS -- so it excludes the display
+        # latency and the camera's own pipeline, both of which happened before
+        # it. He reported having to lead the ball to hit it, which is that
+        # error made visible. These three record the real figure. Declared and
+        # assigned here rather than reached for with getattr (C8).
+        self._selftest_seen_t = None
+        self._selftest_paint_t = None
+        self._selftest_latencies: list = []
         # Declared and assigned unconditionally rather than reached for with
         # `getattr(self, "_floor_retries", 0)`. That construct is how
         # `stats.last_shot_at` returned 0.0 through a default for days while
@@ -1038,6 +1053,9 @@ class CameraLab(QMainWindow):
         # `_build_scene` with no player count at all, which is the default 1.
         self.settings.players = normalise_players(self.settings.players)
         self.scene.players = self.settings.players
+        # What the hit test cannot observe about a shot's age: see
+        # `Mode.shot_age` and `settings.PIPELINE_LAG_DEFAULT`.
+        self.scene.shot_pipeline_lag_s = self.settings.pipeline_lag_s
         # THE MAGAZINE: the one saved number that is both the length of a round
         # and the count of bullets drawn. Read here, held by the host, and
         # nowhere else; a missing key is the default (`settings.py`) and reading
@@ -3375,6 +3393,10 @@ class CameraLab(QMainWindow):
                     self._selftest_seen = (mapped, float(shot.peak),
                                            float(shot.area),
                                            float(shot.duration_ms))
+                    # The FIRST frame that held the dot, which is the same end
+                    # of the pulse `ShotEvent.t` is taken from, so the latency
+                    # measured here is the one the hit test is missing.
+                    self._selftest_seen_t = float(shot.first_timestamp)
             return
 
         if not self._camera_sees_our_screen():
@@ -3399,6 +3421,12 @@ class CameraLab(QMainWindow):
         points = 0
         target_id = None
         near = None
+        # BESIDE `near`, not inside the branch that fills it. Declared here it
+        # is set on every path that can reach the SHOT line; declared where it
+        # is measured, the paths that skip the measurement reached the log with
+        # it unbound and the whole evidence line collapsed into "shot evidence
+        # failed". Caught by test_ui_smoke, which reads the real line.
+        aim = ""
         # THE END OF THE CHAIN (lsa/watchdog.py). Did anything actually get put
         # on the scene for this shot? Decided from what the drawing code did,
         # never from what it meant to do: a hole counts only if the holes layer
@@ -3478,6 +3506,17 @@ class CameraLab(QMainWindow):
                     self._say_once("nearest-failed",
                                    f"  could not measure the distance to the "
                                    f"nearest target: {exc!r}")
+                # Same rules as `nearest`: BEFORE the mode acts, log-only, and
+                # never allowed to cost a hole. Empty for every mode without a
+                # travelling target. (Initialised beside `near` above, so a
+                # path that never reaches here still has it.)
+                try:
+                    aim = host.aim_debug(ev, ctx) or ""
+                    self._note_aim_residual(host.aim_measure(ev, ctx), near)
+                except Exception as exc:
+                    self._say_once("aim-debug-failed",
+                                   f"  could not measure the aim offset "
+                                   f"against the target's heading: {exc!r}")
                 # The side the shot belongs to (the only mode in single-player).
                 routed = host.mode_for(ev.x, ctx)
                 before_mode = mode_snapshot(routed)
@@ -3643,6 +3682,7 @@ class CameraLab(QMainWindow):
         try:
             extra = "  ".join(x for x in (
                 describe_nearest(near, bool(scored), target_id, self._mm_per_px()),
+                aim,
                 f"t={shot.first_timestamp:.3f}",
                 f"mic_peak={mic_txt}",
                 shot_evidence(shot, float(self.sp_minpeak.value()),
@@ -9640,8 +9680,150 @@ class CameraLab(QMainWindow):
             return [1.0]
         return list(type(synth).BRIGHTNESS_SPREAD)
 
+    # The fewest qualifying shots the learned lag may rest on, however small
+    # the magazine is set. A median wants a real sample; a two-shot magazine
+    # must not be able to retune the hit test.
+    LAG_SAMPLES_FLOOR = 12
+
+    # HOW MUCH OF THE MEASURED RESIDUAL TO TAKE each time, and it must be well
+    # under 1.0. Taking all of it OSCILLATES, which his own shots showed on
+    # 2026-11-08: a magazine's median swings about +-30ms, so at 95ms the
+    # residual read +30 and the lag went to 125ms, where the residual read -47
+    # and would have dragged it back to 78ms, and so on for ever. A fraction
+    # converges on the same answer instead of hunting around it -- from 95ms
+    # this lands on 107ms, which is where his two bracketing measurements say
+    # the true value is. The cost is that it takes a few magazines to settle,
+    # which is the right trade for a number that silently changes scoring.
+    LAG_STEP = 0.4
+
+    def _lag_samples_needed(self) -> int:
+        """A magazine's worth of qualifying shots, never fewer than the floor.
+
+        READ FROM THE MAGAZINE, not typed. The suite refuses a second copy of
+        that number anywhere outside settings.py, because two copies of one
+        fact drift apart -- and it caught this method writing `17` by hand.
+        """
+        return max(self.LAG_SAMPLES_FLOOR, int(self.settings.magazine or 0))
+
+    def _note_aim_residual(self, measured: object, near: object) -> None:
+        """File one shot's implied pipeline lag, and fold it in when there are
+        enough. See the module docstring of the patch that added this.
+
+        `measured` is `(along, cross, speed)` from `Mode.aim_measure`; `near`
+        is `(id, distance, radius)` from `Mode.nearest`, which is where the
+        target's own radius comes from -- the qualifying window is in units of
+        the target, not in pixels typed here.
+        """
+        if measured is None or near is None:
+            return
+        try:
+            along, cross, speed = (float(measured[0]), float(measured[1]),
+                                   float(measured[2]))
+            radius = float(near[2])
+        except (TypeError, ValueError, IndexError):
+            return
+        if speed <= 1.0 or radius <= 1.0:
+            return
+        # Laterally on the target and within two radii along it: he was
+        # plausibly aiming at this thing. Anything else is not evidence about
+        # timing, and a shot at the far wall would read as a huge lag.
+        if abs(cross) >= radius or abs(along) >= 2.0 * radius:
+            return
+        self._lag_samples.append(-along / speed)
+        if len(self._lag_samples) < self._lag_samples_needed():
+            return
+
+        got = sorted(self._lag_samples)
+        self._lag_samples = []
+        n = len(got)
+        resid = got[n // 2] if n % 2 else (got[n // 2 - 1] + got[n // 2]) / 2.0
+        was = float(self.settings.pipeline_lag_s)
+        now = normalise_pipeline_lag(was + self.LAG_STEP * resid)
+        self.settings.pipeline_lag_s = now
+        self.scene.shot_pipeline_lag_s = now
+        # REPORTED BEFORE IT IS SAVED, and that order is the point. The first
+        # version saved first and logged second, the save raised (it needs the
+        # path, which `_save_settings` supplies and a bare `settings.save()`
+        # does not), and the exception was swallowed by the caller's guard --
+        # so the value moved 60ms -> 118ms and CHANGED SCORING with nothing in
+        # the log to say it had. A learned number that alters the game must
+        # announce itself even when the write that follows fails (C1, C3).
+        self._log(
+            f"  shot timing: over {n} shots at moving targets the median "
+            f"landed {resid * 1000.0:+.0f}ms behind the centre the hit test "
+            f"used, so the pipeline lag moves {was * 1000.0:.0f}ms -> "
+            f"{now * 1000.0:.0f}ms"
+            # Against the DAMPED figure, which is what `now` was computed
+            # from. Comparing the undamped one reported CLAMPED on every
+            # single update, which is a warning that means nothing and so
+            # trains the reader to ignore a real one.
+            + (" (CLAMPED: the measurement asked for more than a pipeline "
+               "latency can be)"
+               if abs((was + self.LAG_STEP * resid) - now) > 1e-6 else "")
+            + ". This is the display plus the camera, which happen before a "
+              "shot's timestamp exists and so cannot be seen in it.")
+        # Through the app's own seam, which knows the path and which the tests
+        # replace wholesale. A bare `AppSettings.save()` needs a path it was
+        # never given here, and that is exactly how this went wrong once.
+        if not self._save_settings():
+            self._log("  ...but SAVING IT FAILED, so this measurement applies "
+                      "to this session only and the next launch will start "
+                      "from the old value.")
+
     def _selftest_arm(self) -> None:
         self._selftest_seen = None
+        self._selftest_seen_t = None
+        self._selftest_paint_t = None
+
+    def _selftest_mark_paint(self) -> None:
+        """The instant the dot's paint completed. Called straight after the
+        `Paint()` that shows it, so it is the app's last word before the
+        photons leave: everything after this is the display and the camera."""
+        self._selftest_paint_t = time.perf_counter()
+
+    def _selftest_note_latency(self) -> None:
+        """File this dot's paint-to-detection latency, if both ends exist.
+
+        Silently skipping an unmeasurable dot would make a run that measured
+        nothing look like a run that measured zero (C1), so the count of
+        attempts is what the report divides by, and the report says plainly
+        when the list is empty.
+        """
+        t0 = self._selftest_paint_t
+        t1 = self._selftest_seen_t
+        if t0 is None or t1 is None:
+            return
+        gap = (float(t1) - float(t0)) * 1000.0
+        # A negative gap is impossible and means the two clocks are not the
+        # same one (B4). Recorded as-is rather than clamped, so it shows up
+        # in the report instead of being hidden by a max(0, ...).
+        self._selftest_latencies.append(gap)
+
+    def _selftest_latency_line(self) -> str:
+        """What the dots measured, for the log. Never silent."""
+        got = list(self._selftest_latencies)
+        if not got:
+            return ("  paint-to-detection latency: NOT MEASURED - no dot "
+                    "produced both a paint time and a detection timestamp. "
+                    "The ball's hit test is still rewinding by the frame's "
+                    "arrival time alone.")
+        got.sort()
+        n = len(got)
+        mid = got[n // 2] if n % 2 else (got[n // 2 - 1] + got[n // 2]) / 2.0
+        # The CONFIGURED rate, which is the one the app itself reads
+        # (`self.settings.fps`). Not reached for with getattr: C8.
+        fps = float(self.settings.fps)
+        frame_ms = (1000.0 / fps) if fps > 1.0 else 0.0
+        head = (f"  paint-to-detection latency over {n} dots: "
+                f"min {got[0]:.0f}ms, median {mid:.0f}ms, max {got[-1]:.0f}ms")
+        frame_note = ""
+        if frame_ms:
+            frame_note = (f" (one camera frame is {frame_ms:.0f}ms; the "
+                          f"minimum is the tightest estimate, because the "
+                          f"wait for the next frame can only ADD to it)")
+        tail = (". This is the display plus the camera pipeline: the part of "
+                "a shot's true age that `ctx.now - ev.t` cannot see.")
+        return head + frame_note + tail
 
     def _selftest_retune(self, radius: float, seen: object,
                          left: int) -> "tuple[float, bool, str]":
@@ -10830,6 +11012,8 @@ class CameraLab(QMainWindow):
             QTimer.singleShot(100, self._modetest_next)
             return
         self._selftest_seen = None
+        self._selftest_seen_t = None
+        self._selftest_paint_t = None
         self._modetest_aim = target
         self._modetest_hits_before = int(getattr(mode, "hits", 0) or 0)
         self._modetest_shots_before = int(getattr(mode, "shots", 0) or 0)

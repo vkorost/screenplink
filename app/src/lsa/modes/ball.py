@@ -281,6 +281,12 @@ class EscalatingBall(Mode):
         return ("ball", math.hypot(ev.x - bx, ev.y - by),
                 self.ring_hit_radius(self.r))
 
+    def aim_measure(self, ev: ShotEvent, ctx: RenderContext):
+        # Measured against the SAME centre `shot()` tests, so the offset is
+        # the one that decided hit or miss and not an approximation of it.
+        bx, by = self._position_at(self.shot_age(ev, ctx), ctx)
+        return self.aim_offsets(ev, bx, by, self.vx, self.vy)
+
     def status(self) -> str:
         mult = self.SPEED_STEP ** (self.level - 1)
         top = "  (top)" if self.level >= self.MAX_LEVEL else ""

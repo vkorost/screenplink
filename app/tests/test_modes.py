@@ -439,6 +439,71 @@ def main() -> int:
     check("a bounce between the shot and now is unfolded correctly",
           abs(px_then - (inner.left() + 30.0)) < 1.0, f"{px_then - inner.left():.1f}")
 
+    print("15a2. a shot's timestamp arrives late, and the hit test allows for it")
+    # `ev.t` is stamped when cap.read() RETURNS. The display latency and the
+    # camera's own pipeline happened BEFORE that, to a ball the shooter had
+    # already aimed at. Measured on his bench 2026-11-08 at 67ms, from 68
+    # scored shots whose median landed 46.5px behind the tested centre.
+    LAG = 0.067
+    for cls_name, cls_ in (("ball", EscalatingBall), ("balls", _BB)):
+        m, _c0 = _fast(cls_)
+        b = m if cls_ is EscalatingBall else m.balls[0]
+        b.x, b.y = SW / 2.0, SH / 2.0
+        # Fast enough that the lag alone is more than a radius: the regime he
+        # shoots in once the speed is wound up, and the one where the whole
+        # trailing half of the ball goes dead.
+        b.vx, b.vy = b.r * 1.5 / LAG, 0.0
+        seen_age = 0.02                      # what `ctx.now - ev.t` can see
+        # Where the ball was when its image reached the glass: BOTH delays.
+        aimed_x = b.x - b.vx * (seen_age + LAG)
+        ev = modes.ShotEvent(aimed_x, b.y, 100.0, 1)
+        lagged = context(now=100.0 + seen_age)
+        lagged.shot_pipeline_lag_s = LAG
+        drift = abs(aimed_x - b.x) / b.r
+        check(f"{cls_name}: a shot where the ball was when he SAW it is a HIT "
+              f"(it has since moved {drift:.2f} radii)",
+              m.shot(ev, lagged).hit, f"drift {drift:.2f}r")
+
+        # AND THE CHECK CAN FAIL (C1). Without the lag the same shot misses --
+        # which is precisely the bug he reported: "I hit the ball and it did
+        # not blow up, on the side opposite the ball's direction".
+        m2, _ = _fast(cls_)
+        b2 = m2 if cls_ is EscalatingBall else m2.balls[0]
+        b2.x, b2.y = SW / 2.0, SH / 2.0
+        b2.vx, b2.vy = b.vx, 0.0
+        blind = context(now=100.0 + seen_age)      # lag left at its 0.0 default
+        ev2 = modes.ShotEvent(aimed_x, b2.y, 100.0, 2)
+        check(f"{cls_name}: and WITHOUT the pipeline lag that same shot misses, "
+              f"so this check can fail", not m2.shot(ev2, blind).hit)
+
+        # A hostile lag cannot teleport the hit test: MAX_REWIND_S still binds.
+        m3, _ = _fast(cls_)
+        b3 = m3 if cls_ is EscalatingBall else m3.balls[0]
+        b3.x, b3.y, b3.vx, b3.vy = SW / 2.0, SH / 2.0, 400.0, 0.0
+        wild = context(now=100.0)
+        wild.shot_pipeline_lag_s = 99.0
+        check(f"{cls_name}: an absurd lag is still capped at MAX_REWIND_S",
+              abs(modes.Mode.shot_age(modes.ShotEvent(0.0, 0.0, 100.0, 3), wild)
+                  - modes.Mode.MAX_REWIND_S) < 1e-9)
+
+    # The lag is a SETTING, measured per machine, and a corrupt one must not
+    # reach the hit test (C16's sibling: a hand-edited file costs the value,
+    # never the launch).
+    from lsa.settings import (AppSettings, normalise_pipeline_lag,
+                              PIPELINE_LAG_DEFAULT, PIPELINE_LAG_MAX,
+                              PIPELINE_LAG_MIN)
+    check("a negative pipeline lag clamps to the floor",
+          normalise_pipeline_lag(-1.0) == PIPELINE_LAG_MIN)
+    check("an absurd pipeline lag clamps to the ceiling",
+          normalise_pipeline_lag(99.0) == PIPELINE_LAG_MAX)
+    for junk in ("not a number", None, float("nan")):
+        check(f"an unreadable pipeline lag ({junk!r}) falls back to the default",
+              normalise_pipeline_lag(junk) == PIPELINE_LAG_DEFAULT)
+    check("a hostile value in settings is normalised on load, not on use",
+          AppSettings(pipeline_lag_s=99.0).pipeline_lag_s == PIPELINE_LAG_MAX)
+    check("the lag ceiling is well under the rewind ceiling, so the two "
+          "clamps cannot fight", PIPELINE_LAG_MAX < modes.Mode.MAX_REWIND_S)
+
     # The multi-ball mode has the same cap: five levels, +5% speed, -5% size.
     mcap, cc = _fast(_BB)
     speed1 = math.hypot(mcap.balls[0].vx, mcap.balls[0].vy)

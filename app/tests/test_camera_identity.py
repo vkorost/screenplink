@@ -123,6 +123,33 @@ check(len(_bare) == 1 and _bare[0].strip() in _say_body,
       "...and the only direct log() call in the module is the guarded one",
       f"{len(_bare)} found: {_bare}")
 
+# EVERY WINDOWS CALL NEEDS AN EXPLICIT SIGNATURE (2026-11-07, shipped in
+# v1.0.1 and inert there). ctypes defaults an un-annotated integer argument to
+# a 32-bit C int, so a 64-bit HANDLE raises OverflowError as soon as its value
+# happens to be large -- and how large depends on where Windows loaded the
+# module. DefWindowProcW was given a signature because it broke in testing;
+# CreateWindowExW was not, so registration worked from source and failed in
+# the frozen build, where it fell back silently and the camera fix never
+# fired. Setting one signature because one call broke is the half-fix this
+# project keeps paying for (RULES E1).
+_called = set(re.findall(r"(?:user32|kernel32)\.(\w+)\(", src_power))
+_typed = set(re.findall(r"(?:user32|kernel32)\.(\w+)\.argtypes\s*=", src_power))
+_untyped = sorted(_called - _typed)
+check(not _untyped,
+      "every Windows function the module CALLS has explicit argtypes",
+      f"missing argtypes: {_untyped}")
+check(len(_called) >= 4,
+      "...and the scan actually found the calls to check",
+      f"{sorted(_called)}")
+
+if sys.platform.startswith("win"):
+    check(power.watch() is True,
+          "the watcher really does register on this machine",
+          "a False here is the silent fallback: the fix would be inert")
+    check(power.state() in (power.ON, power.OFF, power.DIMMED, power.UNKNOWN),
+          "...and the state it reports is one of the four known answers",
+          power.NAMES.get(power.state(), "?"))
+
 # =============================================================================
 print("\n=== B. who is blamed for a black frame ===")
 print("    reverting `blame_for_a_black_frame` to a bare `return \"display\"` "

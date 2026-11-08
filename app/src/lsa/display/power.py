@@ -164,14 +164,6 @@ def _register(log=None) -> bool:
         _fields_ = [("PowerSetting", GUID), ("DataLength", w.DWORD),
                     ("Data", ctypes.c_ubyte * 4)]
 
-    # SET THE SIGNATURES. Without them ctypes infers a 32-bit int for the
-    # LPARAM and DefWindowProcW raises OverflowError on a real window handle
-    # -- which surfaces as a callback that silently never records anything.
-    user32.DefWindowProcW.restype = ctypes.c_longlong
-    user32.DefWindowProcW.argtypes = [w.HWND, w.UINT, w.WPARAM, w.LPARAM]
-    user32.CreateWindowExW.restype = w.HWND
-    user32.RegisterPowerSettingNotification.restype = w.HANDLE
-
     WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_longlong, w.HWND, w.UINT,
                                  w.WPARAM, w.LPARAM)
 
@@ -195,6 +187,33 @@ def _register(log=None) -> bool:
                     ("hInstance", w.HINSTANCE), ("hIcon", w.HICON),
                     ("hCursor", w.HANDLE), ("hbrBackground", w.HBRUSH),
                     ("lpszMenuName", w.LPCWSTR), ("lpszClassName", w.LPCWSTR)]
+
+    # EVERY SIGNATURE, EXPLICITLY. ctypes defaults an un-annotated integer
+    # argument to a 32-bit C int, so any 64-bit HANDLE passed without an
+    # argtypes entry raises OverflowError as soon as the value happens to be
+    # large -- and whether it is large depends on where Windows loaded the
+    # module, which is why this passed from source and failed in the frozen
+    # build (2026-11-07, v1.0.1: "argument 11: OverflowError: int too long to
+    # convert", argument 11 being hInstance). The result is not a crash but a
+    # SILENT fallback: registration fails, the state stays UNKNOWN, and the
+    # camera fix this module exists for never fires.
+    #
+    # Setting one signature because one call broke is the half-fix this
+    # project keeps paying for (RULES E1). These are all of them.
+    kernel32.GetModuleHandleW.restype = w.HMODULE
+    kernel32.GetModuleHandleW.argtypes = [w.LPCWSTR]
+    user32.DefWindowProcW.restype = ctypes.c_longlong
+    user32.DefWindowProcW.argtypes = [w.HWND, w.UINT, w.WPARAM, w.LPARAM]
+    user32.RegisterClassW.restype = w.ATOM
+    user32.RegisterClassW.argtypes = [ctypes.POINTER(WNDCLASS)]
+    user32.CreateWindowExW.restype = w.HWND
+    user32.CreateWindowExW.argtypes = [
+        w.DWORD, w.LPCWSTR, w.LPCWSTR, w.DWORD,
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+        w.HWND, w.HMENU, w.HINSTANCE, ctypes.c_void_p]
+    user32.RegisterPowerSettingNotification.restype = w.HANDLE
+    user32.RegisterPowerSettingNotification.argtypes = [
+        w.HANDLE, ctypes.POINTER(GUID), w.DWORD]
 
     proc = WNDPROC(_proc)
     cls = WNDCLASS()

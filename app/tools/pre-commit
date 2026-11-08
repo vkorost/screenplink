@@ -136,7 +136,7 @@ say "the Director, and that its checks can fail"
 
 # ---- 4. the rest of the synthetic suite -------------------------------
 say "the synthetic suite (no camera, no screen)"
-for t in test_detector test_ui_smoke test_modes test_align test_feedback          test_exposure test_selfcheck test_pattern_cal test_routines          test_artwork test_ceiling test_figures test_replay          test_playarea test_silent_audio test_shotreader          test_splash test_watchdog test_screenwatch test_voice test_volume_fall          test_menu test_mcp test_doctor test_ghost test_audio_own; do
+for t in test_detector test_ui_smoke test_modes test_align test_feedback          test_exposure test_selfcheck test_pattern_cal test_routines          test_artwork test_ceiling test_figures test_replay          test_playarea test_silent_audio test_shotreader          test_splash test_watchdog test_screenwatch test_voice test_volume_fall          test_menu test_mcp test_doctor test_ghost test_audio_own          test_mode_speed test_camera_identity; do
     "$PY" "tests/$t.py" >/dev/null 2>&1 || {
         "$PY" "tests/$t.py" || true
         fail "tests/$t.py"

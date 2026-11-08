@@ -121,6 +121,34 @@ rank index  result       fps   exp%  floor   flash  camera
 frames of nothing, sometimes containing a saturated red X, which is precisely
 what the detector hunts.
 
+### The names move, and the app now works around it
+
+Windows does not guarantee that a camera keeps its name or its position across a
+reboot. On the bench this app was built on, a restart moved the generic name
+"USB Video Device" from one camera onto another, and the app, which remembers
+its camera by name, opened the wrong one.
+
+The app remembers the name because that normally survives a reshuffle better
+than an index does. What matters is that a wrong guess recovers by itself:
+
+- When the camera it opened cannot see the monitor flash, the app asks **Windows**
+  whether the display is actually powered, which costs no camera traffic.
+- If the screen is on, the black frame belongs to the camera, so the app moves to
+  the next real camera and measures again. Each one is tried at most once per
+  launch, so it cannot cycle.
+- If the screen is off, dimmed, or Windows will not say, the app reports a
+  sleeping display and leaves the camera alone. Cycling cameras cannot light a
+  screen, and letting go of a working one to prove that has cost whole sessions.
+
+So if the log says the display looks asleep while you are looking at a lit
+screen, the thing to check is whether Windows has gone quiet about the power
+state, not the camera. `Doctor.cmd` settles it in one run: it ranks every camera
+and saves a picture from each, and the picture says which one is pointed at the
+monitor.
+
+**The names in that report are Windows' names, not the cameras'.** Trust the
+measurements and the pictures over the label beside them.
+
 ### A wedged camera
 
 Symptoms: the camera takes tens of seconds to open, or opens and delivers no

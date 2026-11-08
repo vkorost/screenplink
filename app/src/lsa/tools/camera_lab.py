@@ -134,6 +134,7 @@ from lsa.display.layers import (band_height_for, bottom_strip_for,            # 
 from lsa.display.scene import Scene                                           # noqa: E402
 from lsa.display.session import SessionStats                                  # noqa: E402
 from lsa.display.foreground import force_to_front  # noqa: E402
+from lsa.display import power as display_power                    # noqa: E402
 from lsa.display.splash import Splash  # noqa: E402
 from lsa.display.window import TargetWindow                                   # noqa: E402
 from lsa.settings import AppSettings, normalise_magazine, normalise_players  # noqa: E402
@@ -1151,6 +1152,17 @@ class CameraLab(QMainWindow):
         self._room_timer.start()
 
         self._build_ui()
+        # ASK WINDOWS whether the monitor is powered, so a blind lens and a
+        # sleeping monitor -- the same black frame to any camera -- can be
+        # told apart without touching the camera (lsa/display/power.py carries
+        # the two incidents that paid for this).
+        #
+        # AFTER `_build_ui`, not before: `self._log` writes to a widget that
+        # does not exist until it has run, and registering this at the top of
+        # __init__ stopped the app from starting at all on 2026-11-07. The
+        # answer is not wanted until the screen is first flashed, about twenty
+        # seconds from here, and the notification arrives on the Qt event loop.
+        display_power.watch(log=lambda s: self._log(s))
         self._apply_settings_to_widgets()
         self._populate_devices()
 
@@ -1203,6 +1215,9 @@ class CameraLab(QMainWindow):
         background = SolidBackground()
         layers = {
             "background": scene.add(background),
+            # The host reads a drill's remembered speed through this on every
+            # start (`_start_all`), rather than being handed the settings
+            # object: persisting stays with the app (RULES C11).
             "modes": scene.add(ModeHost()),
             "holes": scene.add(BulletHoles()),
             "calibration": scene.add(CalibrationTargets()),
@@ -1223,6 +1238,9 @@ class CameraLab(QMainWindow):
             "help": scene.add(KeyHelp()),
         }
         layers["playarea"].visible = bool(playarea.BORDER_ENABLED)
+        # Every drill start -- picking it, N, a next round -- reads the saved
+        # speed through this one callable (modes/base.py `_start_all`).
+        layers["modes"].speed_provider = self.settings.speed_for
         # THE SCREEN IS NEVER EMPTY, and what is on it while the app MEASURES
         # ITSELF is the static targets -- a handful of thin rings on black.
         #
@@ -4826,10 +4844,33 @@ class CameraLab(QMainWindow):
         # landed. The camera-space minimap keys off this.
         self.scene.calibrated = self.mapping is not None
         if self._blind and self._display_dark and not self._connected_device_is_virtual():
-            # THE DISPLAY WAS NOT LIT. The camera is not the suspect, so nothing
-            # below -- the blind-camera message, the camera cycling -- applies.
-            self._report_display_asleep()
-            return
+            # A BLIND LENS AND A SLEEPING MONITOR ARE THE SAME BLACK FRAME, and
+            # `_display_dark` was measured THROUGH THE VERY CAMERA under
+            # suspicion -- so on its own this branch cannot tell them apart. It
+            # has now guessed wrong in both directions, a month apart:
+            #
+            #   2026-10-19  monitor asleep, healthy camera blamed, cycled into
+            #               a wedge and shut down. That is why this guard exists.
+            #   2026-11-07  a reboot moved the name `USB Video Device` onto the
+            #               BLINDED C920. The app opened it, saw black, took
+            #               THIS branch, and told him his lit 4K monitor was
+            #               asleep -- while the camera-cycling code written for
+            #               exactly that case sat unreachable below.
+            #
+            # So ask the operating system, which knows, and costs no camera
+            # traffic to ask (RULES C6: measure the thing, not a proxy; the
+            # proxy here is the camera). It is believed ONLY when it positively
+            # says the panel is lit. OFF, DIMMED and UNKNOWN every one keep the
+            # old behaviour exactly, so on a machine that cannot answer this,
+            # nothing changes and 2026-10-19 cannot come back.
+            if self.blame_for_a_black_frame() == "display":
+                self._report_display_asleep()
+                return
+            self._log("the screen flash made no difference to this camera, but "
+                      "WINDOWS REPORTS THE DISPLAY IS ON, so the black frame is "
+                      "this camera's and not the monitor's. Treating it as a "
+                      "blind camera and measuring the others (RULES A11: "
+                      "identify a camera by what it DOES, never by its name).")
         if self._blind:
             self._log("NOT starting calibration: the screen flash made no "
                       "difference to the camera image, so it is not pointed at "
@@ -4957,6 +4998,26 @@ class CameraLab(QMainWindow):
             return
         if self.mapping is None:
             self.start_grid_calibration()
+
+    @staticmethod
+    def blame_for_a_black_frame() -> str:
+        """Who owns a camera frame that stayed black when the WHOLE monitor was
+        flashed: "display" or "camera".
+
+        The two produce an identical picture, so this is the one question the
+        camera cannot answer about itself. Windows can, for no camera traffic
+        (lsa/display/power.py carries the two incidents that paid for it).
+
+        "camera" ONLY when the operating system positively reports the panel
+        lit. OFF, DIMMED and UNKNOWN all answer "display", which is exactly
+        what this code did before Windows was asked -- so a machine that
+        cannot answer behaves as it always did.
+
+        A named seam rather than an inline condition, so the four states can
+        be walked by a test without power-saving anybody's monitor
+        (tests/test_camera_identity.py).
+        """
+        return "camera" if display_power.is_lit() else "display"
 
     def _report_display_asleep(self) -> None:
         """The screen search's white frame never got bright: the display is asleep
@@ -9309,6 +9370,12 @@ class CameraLab(QMainWindow):
         if key in self.VOLUME_DOWN_KEYS:
             self._step_volume(-1)
             return
+        if key in self.SPEED_UP_KEYS:
+            self._step_speed(+1)
+            return
+        if key in self.SPEED_DOWN_KEYS:
+            self._step_speed(-1)
+            return
         if key == Qt.Key_C:
             # SELF-CALIBRATE is on C (2026-10-21). It was K. K is reserved for
             # the Keyboard Shortcuts mode and is deliberately bound to NOTHING
@@ -11688,6 +11755,83 @@ class CameraLab(QMainWindow):
         ro = self.layers.get("volume")
         if ro is not None and self._info_shootable():
             ro.show_volume(f"VOLUME {self.sld_volume.value()}%{end}", time.perf_counter())
+            self.scene.mark_dirty()
+
+    # Page Up / Page Down change HOW FAST THE ACTIVE DRILL'S TARGETS MOVE, and
+    # the multiplier is remembered per drill (settings.mode_speed). Asked for
+    # 2026-11-07; square brackets were considered and dropped because the
+    # camera pane already owns them, and a key that means two things depending
+    # on what is up is the complaint already open against O and T.
+    SPEED_UP_KEYS = (Qt.Key_PageUp,)
+    SPEED_DOWN_KEYS = (Qt.Key_PageDown,)
+    # Percent rungs. Roughly geometric, for the same reason the volume ladder
+    # is: a flat +10 is a near-doubling at the slow end and nothing at the fast
+    # one. 100 is the drill as designed and is ON the ladder, so there is always
+    # a way back to it, and the ends match settings.SPEED_MIN/SPEED_MAX.
+    SPEED_LADDER = (25, 35, 50, 70, 85, 100, 120, 140, 170, 200, 250, 300)
+
+    @classmethod
+    def next_speed(cls, current_pct: int, direction: int) -> int:
+        """The next rung up (+1) or down (-1) from `current_pct`, clamped.
+
+        Pure and classmethod for the same reason `next_volume` is: the rungs
+        can then be walked end to end by a test without a window, a camera or
+        a drill (tests/test_mode_speed.py).
+        """
+        ladder = cls.SPEED_LADDER
+        if direction > 0:
+            for v in ladder:
+                if v > current_pct:
+                    return v
+            return ladder[-1]
+        for v in reversed(ladder):
+            if v < current_pct:
+                return v
+        return ladder[0]
+
+    def _step_speed(self, direction: int) -> None:
+        """One press of Page Up or Page Down: change the live drill's speed,
+        remember it for THAT drill, and say what happened.
+
+        It SAYS SO even when the drill has no speed to change. A key that
+        appears to work and silently does nothing is RULES C1, and this one is
+        pressed while the shooter is downrange looking at the screen, not at a
+        log.
+        """
+        host = self.layers.get("modes")
+        mode = getattr(host, "mode", None) if host is not None else None
+        ro = self.layers.get("volume")
+        shootable = self._info_shootable()
+
+        if mode is None or not getattr(mode, "supports_speed", False):
+            what = getattr(mode, "title", "") or "this screen"
+            self._log(f"speed: {what} has no targets whose speed can be changed "
+                      f"(Page Up / Page Down work in Escalating Ball, Bouncing "
+                      f"Balls and Moving Target).")
+            if ro is not None and shootable:
+                ro.show_readout(f"{what.upper()} HAS NO SPEED", time.perf_counter())
+                self.scene.mark_dirty()
+            return
+
+        before = int(round(self.settings.speed_for(mode.name) * 100))
+        target = self.next_speed(before, direction)
+        applied = host.set_speed_scale(target / 100.0)
+        if applied is None:                      # the drill changed under us
+            return
+        stored = self.settings.set_speed_for(mode.name, applied)
+        self._schedule_save()
+
+        end = ""
+        if target == self.SPEED_LADDER[-1] and direction > 0:
+            end = "  (fastest)"
+        elif target == self.SPEED_LADDER[0] and direction < 0:
+            end = "  (slowest)"
+        self._log(f"speed: {mode.title} {before}% -> {int(round(stored * 100))}% "
+                  f"(remembered for this drill only; the drill's own ceiling "
+                  f"still applies)")
+        if ro is not None and shootable:
+            ro.show_readout(f"{mode.title.upper()} SPEED "
+                            f"{int(round(stored * 100))}%{end}", time.perf_counter())
             self.scene.mark_dirty()
 
     def _on_volume_changed(self, value: int) -> None:

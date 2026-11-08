@@ -34,7 +34,7 @@ from ..display.layers import (GREY_HI, GREY_MISS as COOL, GREY_HIT as GOOD,
 from ..display.scene import RenderContext
 from ..audio.mixer import POP_SOUND
 from .. import ghost
-from .base import Mode, ShotEvent, ShotOutcome, register
+from .base import LASER_SPEED_CEILING, Mode, ShotEvent, ShotOutcome, register
 
 OUTLINE = QColor(GREY_HI)         # red excess 0, under the brightness ceiling: see paint()
 # THE BALL IS FILLED, very darkly. See `paint`: the fill is what a dot lands
@@ -57,6 +57,10 @@ class EscalatingBall(Mode):
         """The ball(s) are in continuous motion for the whole round, so the
         sensitivity learner is PAUSED in this mode (logged, not silent)."""
         return True
+
+    # Page Up / Page Down change this drill's speed; the multiplier is
+    # remembered per drill in `settings.mode_speed["ball"]`.
+    supports_speed = True
 
     START_SPEED = 0.09        # screen widths per second: half the first draft's drift
     SPEED_STEP = 1.05         # +5% per level
@@ -102,9 +106,33 @@ class EscalatingBall(Mode):
         self._spawn(ctx, away_from=None)
 
     def _speed_px(self, ctx: RenderContext) -> float:
-        """Current speed in pixels per second."""
-        return (self.START_SPEED * (self.SPEED_STEP ** (min(self.level, self.MAX_LEVEL) - 1))
-                * self.playfield(ctx).width())
+        """Current speed in pixels per second, at the shooter's multiplier.
+
+        Capped at `LASER_SPEED_CEILING` for the reason measured there: a
+        ball crossing faster than about two screen widths a second travels
+        more than its own diameter inside one 100 ms laser pulse.
+        """
+        frac = min(LASER_SPEED_CEILING,
+                   self.START_SPEED
+                   * (self.SPEED_STEP ** (min(self.level, self.MAX_LEVEL) - 1))
+                   * self.speed_scale)
+        return frac * self.playfield(ctx).width()
+
+    def respeed(self, ctx: RenderContext) -> None:
+        """Re-speed the ball in flight, keeping its heading and its level.
+
+        A shot in the air is rewound by `self.vx * age` to find where the ball
+        was when the trigger broke. A speed change landing inside that ~30 ms
+        window shifts that rewind by the difference, which is far below the
+        dot's own size; it is not worth freezing the speed to avoid.
+        """
+        want = self._speed_px(ctx)
+        have = math.hypot(self.vx, self.vy)
+        if have <= 1e-9:
+            return
+        k = want / have
+        self.vx *= k
+        self.vy *= k
 
     def _spawn(self, ctx: RenderContext, away_from: "tuple[float, float] | None") -> None:
         field = self.playfield(ctx)

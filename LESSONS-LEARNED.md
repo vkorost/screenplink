@@ -126,6 +126,27 @@ detector hunts for.
 **Open it, save a frame, look at it, and measure what it can do.** That one step
 settled six faults here, and it was repeatedly the last thing anyone tried.
 
+This came back a month later, after a reboot, and the second half of the lesson
+is the more useful one. The operating system had moved the generic name onto a
+camera with a blind over its lens. The application remembered its camera by
+name, opened the blind one, flashed the whole monitor black then white, measured
+no change at all, and concluded the display was asleep. The display was on.
+
+The code to recover from this already existed and was never reached. A camera
+that cannot see a lit screen and a camera pointed at a screen that is switched
+off produce **the same black frame**. An earlier bug in the opposite direction
+had added a guard that stopped on the second reading before it could try the
+first, and the guard decided which case it was by looking at that same black
+frame.
+
+**When two causes produce an identical measurement, no amount of care with that
+measurement will separate them. The discriminator has to come from outside the
+instrument you are doubting.** Here the operating system already knew whether
+the panel was powered and would say so for the cost of one call and no camera
+traffic at all. The verdict "the display is asleep" now requires the OS to
+agree; when it cannot answer, the code keeps its older, more cautious
+behaviour, so the fix cannot resurrect the bug it replaced.
+
 ## 7. Before theorising about drivers, read what the operating system already recorded
 
 A device that was present and did nothing turned out to be sitting at problem
@@ -344,7 +365,8 @@ Prose cannot be grepped, and nobody reliably re-reads their own prose.
 3. One good run is not a result. Repeat it.
 4. Report error on data the model never saw.
 5. Never force-kill something holding a device.
-6. Identify hardware by behaviour, and look at a frame with your own eyes.
+6. Identify hardware by behaviour, and when two faults look identical, find a
+   witness outside the instrument you are doubting.
 7. Name the device, the file, and the setting you chose on the user's behalf.
 8. Anything that draws on a screen you are measuring is a suspect.
 9. Put cleanup in a `finally`, never in whatever runs next.

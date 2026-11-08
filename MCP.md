@@ -119,6 +119,13 @@ already in front, so anything that steals focus leaves the camera photographing
 the desktop, and every measurement taken after that is a measurement of the
 wrong screen.
 
+**Do not drive an app somebody is using.** A key sent this way is
+indistinguishable from one the shooter pressed, so it lands in whatever round is
+in progress. Two mode changes that arrived this way were reported as a bug in
+the app, and the log showed both were a session pressing keys to verify a
+feature while the owner was shooting. Reading is always safe; writing is not.
+Check whether a round is live before sending anything, or stop the app first.
+
 The keys worth knowing:
 
 ```

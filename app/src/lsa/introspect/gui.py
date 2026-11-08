@@ -172,6 +172,7 @@ class ShotTap(QObject):
 _NAMED = (
     "Escape", "Space", "Backspace", "Return", "Enter", "Tab", "Delete",
     "Left", "Right", "Up", "Down", "BracketLeft", "BracketRight",
+    "PageUp", "PageDown",
     "Plus", "Minus", "Equal", "Comma", "Period", "Slash",
 ) + tuple(f"F{i}" for i in range(1, 13))
 

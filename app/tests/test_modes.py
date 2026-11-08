@@ -5942,7 +5942,12 @@ def main() -> int:
                             ("F", "Measure the Noise Floor")],
         _sc46.HEAD_ON_SCREEN: [("0", "All Readouts"), ("S", "Stats"), ("B", "Status Band"),
                                ("L", "Signal Meter"), ("P", "Camera Pane"), ("V", "Aim the Camera")],
+        # PgUp/PgDn added 2026-11-07 at his request, with the drill speed:
+        # "we will need to record that key among the 'Keys' screen and update
+        # the user manual accordingly". The rest is still the wording approved
+        # in requirements/help_screen_mockup_01.html, untouched.
         _sc46.HEAD_ALSO: [("E", "Erase the Holes"), ("+ -", "Volume Up / Down"),
+                          ("PgUp PgDn", "Target Speed - Faster / Slower"),
                           ("Esc", "Exit the Game")]}
     check("the fixed rows are the ones the owner approved in requirements/help_screen_mockup_01.html: "
           "the five headings in order, the title, and every wording",
@@ -5991,8 +5996,14 @@ def main() -> int:
         "window.keyPressEvent": _strip46("\n".join(_bodies46(_raw46["window"], "keyPressEvent"))),
         "window.TOGGLES": _strip46(_tog46.group(0) if _tog46 else ""),
     }
+    # The named keys the scan can recognise. A key the screen advertises but
+    # this table does not know reads as UNHANDLED even when it is handled
+    # perfectly well, which is how a harness copy of the code goes stale
+    # (RULES C17). PgUp/PgDn joined it with the drill speed, 2026-11-07.
     _TOK46 = {int(_Qt46.Key_Plus): "Qt.Key_Plus", int(_Qt46.Key_Minus): "Qt.Key_Minus",
-              int(_Qt46.Key_Escape): "Qt.Key_Escape"}
+              int(_Qt46.Key_Escape): "Qt.Key_Escape",
+              int(_Qt46.Key_PageUp): "Qt.Key_PageUp",
+              int(_Qt46.Key_PageDown): "Qt.Key_PageDown"}
 
     def _handled46(code, srcs):
         """Who handles this key code, or None."""

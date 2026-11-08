@@ -67,6 +67,9 @@ Find me here: **[linktr.ee/vkorost](https://linktr.ee/vkorost)**
   yourself with a pistol in each hand and work your weak side. **Two lasers
   landing in the same camera frame are detected as two separate shots**, so
   firing together is not a problem.
+- **Set the pace yourself.** Page Up and Page Down change how fast the targets
+  move, and each drill remembers its own setting between sessions. Slow a drill
+  down while you learn it, speed it up when it stops being hard.
 - **Shoot the menu.** The menu is targets too, so you never need the keyboard.
 - **It sets itself up without you firing a shot.** It photographs its own markers
   on the screen to learn where the screen is and which pixel is which, so

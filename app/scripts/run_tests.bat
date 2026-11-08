@@ -69,6 +69,11 @@ echo === arcade modes (synthetic shots, no camera) ===
 if errorlevel 1 set FAILED=%FAILED% modes
 echo.
 
+echo === per-drill target speed (Page Up / Page Down, remembered per drill) ===
+".venv\Scripts\python.exe" "tests\test_mode_speed.py"
+if errorlevel 1 set FAILED=%FAILED% mode_speed
+echo.
+
 echo === auto-alignment (recovers a drifted mapping without any shots) ===
 ".venv\Scripts\python.exe" "tests\test_align.py"
 if errorlevel 1 set FAILED=%FAILED% align
@@ -203,6 +208,11 @@ REM Driven against stand-ins whose faults are parameters: an ignored exposure, a
 REM crushed gain, a sleeping display, a blind camera, a virtual device, a hung driver.
 ".venv\Scripts\python.exe" "tests\test_doctor.py"
 if errorlevel 1 set FAILED=%FAILED% doctor
+echo.
+
+echo === camera identity (a name is not an identity; who owns a black frame) ===
+".venv\Scripts\python.exe" "tests\test_camera_identity.py"
+if errorlevel 1 set FAILED=%FAILED% camera_identity
 echo.
 
 echo === the introspection server: off by default, read-only, no control writes ===

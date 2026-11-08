@@ -77,6 +77,12 @@ away. Everything about a cycle is drawn at random -- which figure, how long the
 wait, which side it comes from, how far away it starts, how long it approaches,
 holds and retreats.
 
+**Page Up and Page Down** change how fast the figure moves, remembered for this
+drill alone. It speeds up the walking: the approach and the retreat get quicker
+and the sideways drift gets faster. The holds are left alone deliberately, since
+a hold is the figure standing still being shot at, and shortening it would be a
+change to how long you get to aim rather than to how fast the target moves.
+
 It reports hit rate and score in three distance bands, and the time from each
 hold beginning to the first hit.
 

@@ -144,6 +144,10 @@ ON_SCREEN = (
 ALSO = (
     Entry("E", "Erase the Holes", (int(Qt.Key_E),)),
     Entry("+ -", "Volume Up / Down", (int(Qt.Key_Plus), int(Qt.Key_Minus))),
+    # Only the three drills that move have a speed; the key says so on screen
+    # when pressed anywhere else, rather than doing nothing (RULES C1).
+    Entry("PgUp PgDn", "Target Speed - Faster / Slower",
+          (int(Qt.Key_PageUp), int(Qt.Key_PageDown))),
     Entry("Esc", "Exit the Game", (int(Qt.Key_Escape),)),
 )
 

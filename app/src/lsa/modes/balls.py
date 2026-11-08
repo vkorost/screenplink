@@ -47,7 +47,7 @@ from ..display.layers import (GREY_HI, GREY_HIT as GOOD, GREY_TEXT, grey_at,
 from ..display.scene import RenderContext
 from ..audio.mixer import POP_SOUND
 from .. import ghost
-from .base import Mode, ShotEvent, ShotOutcome, register
+from .base import LASER_SPEED_CEILING, Mode, ShotEvent, ShotOutcome, register
 
 OUTLINE = QColor(GREY_HI)         # red excess 0, under the brightness ceiling: see paint()
 # THE BALL IS FILLED, very darkly. See `paint`: the fill is what a dot lands
@@ -86,6 +86,10 @@ class BouncingBalls(Mode):
         sensitivity learner is PAUSED in this mode (logged, not silent)."""
         return True
 
+    # Page Up / Page Down change this drill's speed; the multiplier is
+    # remembered per drill in `settings.mode_speed["balls"]`.
+    supports_speed = True
+
     COUNT = 4                 # enough to force target selection, few enough to read
     START_SPEED = 0.08        # screen widths per second
     SPEED_STEP = 1.05         # +5% per level
@@ -102,8 +106,9 @@ class BouncingBalls(Mode):
     MIN_RADIUS_FRAC = 0.010
     # A 100ms pulse at a ball crossing faster than ~2 screen widths per second
     # moves more than its own diameter during the shot, so where it "was" when
-    # the trigger broke stops being well defined.
-    MAX_SPEED = 2.0
+    # the trigger broke stops being well defined. Defined once in base.py,
+    # because Escalating Ball is held to the same ceiling.
+    MAX_SPEED = LASER_SPEED_CEILING
 
     FLASH_S = 0.35
 
@@ -147,9 +152,31 @@ class BouncingBalls(Mode):
 
     def _speed_px(self, ball: _Ball, ctx: RenderContext) -> float:
         lvl = min(ball.level, self.MAX_LEVEL)
+        # THE SHOOTER'S MULTIPLIER GOES INSIDE THE min(), not outside it, so
+        # MAX_SPEED still binds. That ceiling is measured, not chosen: past
+        # ~2 screen widths per second a ball moves more than its own diameter
+        # during a 100 ms pulse, and "where it was when the trigger broke"
+        # stops being well defined -- which would read as the detector
+        # missing rather than as a speed the shooter asked for.
         frac = min(self.MAX_SPEED,
-                   self.START_SPEED * (self.SPEED_STEP ** (lvl - 1)))
+                   self.START_SPEED * (self.SPEED_STEP ** (lvl - 1))
+                   * self.speed_scale)
         return frac * self.playfield(ctx).width()
+
+    def respeed(self, ctx: RenderContext) -> None:
+        """Re-speed every ball already in flight, keeping its direction.
+
+        The level, the size and the heading are untouched: only how fast it is
+        travelling changes, which is what the key says it does.
+        """
+        for b in self.balls:
+            want = self._speed_px(b, ctx)
+            have = math.hypot(b.vx, b.vy)
+            if have <= 1e-9:
+                continue                      # placed but not yet aimed
+            k = want / have
+            b.vx *= k
+            b.vy *= k
 
     def _place(self, ball: _Ball, ctx: RenderContext,
                away_from: "tuple[float, float] | None" = None,

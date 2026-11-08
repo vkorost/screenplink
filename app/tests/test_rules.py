@@ -1195,7 +1195,8 @@ REGISTRY: dict[str, str] = {
     "A8": "judgement (diagnostics live in tools/ with the same rationing)",
     "A9": "judgement (a harness that aborts must still clean up)",
     "A10": "judgement (run_live.ps1 refuses against a wedged camera)",
-    "A11": "judgement (identify by what it does; see CLAUDE.md)",
+    "A11": "test_camera_identity (the OS is asked whether the panel is lit, "
+           "never the suspect camera; cycling bounded per device)",
     "A12": "judgement (read the PnP problem code first)",
     "A13": "judgement (fps only with the exposure fixed)",
     # B -- what the app draws

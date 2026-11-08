@@ -164,6 +164,9 @@ class AdvancingTarget(Mode):
     FAR_FRAC = 1.0 / FAR_RATIO         # h_far = this x h_near
     START_MAX_FRAC = 0.8               # starting height <= this x h_near
     DRIFT_MAX = 0.08                   # screen widths per second, during moves
+    # Page Up / Page Down change this drill's speed; the multiplier is
+    # remembered per drill in `settings.mode_speed["advancing"]`.
+    supports_speed = True
     # TWO PLAYERS: the k-th cycle of each half is the SAME cycle (same figure,
     # same timings, same hold, same drift), position mirrored, at the size a
     # half allows. MEASURED by tests/test_modes.py section 35, at CLOSEST
@@ -325,15 +328,73 @@ class AdvancingTarget(Mode):
 
         return self._link.get(k, make)
 
+    def respeed(self, ctx: RenderContext) -> None:
+        """Re-speed a figure that is already walking, WITHOUT moving it.
+
+        The trick is that position is preserved exactly if the drift is scaled
+        UP by the same factor the remaining move time is scaled DOWN by:
+
+            approaching   x = hx - drift * (t_a - age)
+            retreating    x = hx + drift * (age - t_a - t_h)
+
+        so with drift' = drift * s and every move duration divided by s, each
+        product is unchanged and the figure does not jump. Its HEIGHT is a
+        fraction of the phase (`k`), which is preserved for the same reason,
+        so its apparent distance does not jump either.
+
+        The holds keep their length: a hold is the figure standing still being
+        shot at, and that is the shooter's aiming time, not the target's speed.
+        """
+        for a in self._actors:
+            was = getattr(a, "speed_used", 1.0) or 1.0
+            s = self.speed_scale / was
+            a.speed_used = self.speed_scale
+            if abs(s - 1.0) < 1e-9 or a.phase != "live" or a.fig is None:
+                continue                  # off screen: its next cycle is planned anew
+            age = ctx.now - a.t0
+            t_a, t_h, t_r = a.t_a, a.t_h, a.t_r
+            t_a2, t_r2 = t_a / s, t_r / s
+            if age < t_a:                                     # approaching
+                age2 = age / s
+            elif age < t_a + t_h:                             # holding near
+                age2 = t_a2 + (age - t_a)
+            elif age < t_a + t_h + t_r:                       # retreating
+                age2 = t_a2 + t_h + (age - t_a - t_h) / s
+            else:                                             # holding far
+                age2 = t_a2 + t_h + t_r2 + (age - t_a - t_h - t_r)
+            a.t_a, a.t_r = t_a2, t_r2
+            a.drift *= s
+            a.t0 = ctx.now - age2
+
+    def _moving_s(self, seconds: float) -> float:
+        """A MOVE's duration at the shooter's speed.
+
+        The approach and the retreat are scaled; the two HOLDS are not. A hold
+        is the figure standing still being shot at, and shortening it would be
+        a difficulty change wearing the word "speed" -- the shooter asked to
+        control how fast the target moves, not how long he gets to aim.
+        """
+        return seconds / max(Mode.SPEED_MIN, self.speed_scale)
+
+    def _drift_px(self, field, side: float, speed_frac: float) -> float:
+        """Sideways drift in pixels per second, at the shooter's speed.
+
+        ONE definition, called from `_begin` and from `_begin_shared`. It was
+        two copies of the same expression, which is how the second instance of
+        a change gets missed (RULES E1).
+        """
+        return (side * speed_frac * self.DRIFT_MAX * field.width()
+                * self.speed_scale)
+
     def _begin(self, a: _Actor, ctx: RenderContext) -> None:
         """Plan a whole cycle at the moment the figure appears."""
         fig = a.fig
         field = self.playfield(ctx)
         if a.plan is not None and self._link is not None:
             return self._begin_shared(a, ctx, fig, field)
-        a.t_a = self._rng.uniform(*self.APPROACH_S)
+        a.t_a = self._moving_s(self._rng.uniform(*self.APPROACH_S))
         a.t_h = self._rng.uniform(*self.HOLD_NEAR_S)
-        a.t_r = self._rng.uniform(*self.RETREAT_S)
+        a.t_r = self._moving_s(self._rng.uniform(*self.RETREAT_S))
         a.t_f = self._rng.uniform(*self.HOLD_FAR_S)
         a.h_near = fig.fit_height(field.height(), ctx.height, 1.0)
         a.h_far = a.h_near * self.FAR_FRAC
@@ -347,8 +408,8 @@ class AdvancingTarget(Mode):
                                           avoid=self.menu_keepout(ctx))
         self._prev_hold = a.hold_xy
         side = self._rng.choice((-1, 0, 1))        # from left / straight / from right
-        speed = self._rng.uniform(0.2, 1.0) * self.DRIFT_MAX * field.width()
-        a.drift = side * speed
+        a.drift = self._drift_px(field, side, self._rng.uniform(0.2, 1.0))
+        a.speed_used = self.speed_scale            # what `respeed` rescales FROM
         a.x_lo, a.x_hi = field.left() + w_near / 2.0, field.right() - w_near / 2.0
         if a.x_hi <= a.x_lo:
             a.x_lo = a.x_hi = field.center().x()
@@ -363,7 +424,12 @@ class AdvancingTarget(Mode):
     def _begin_shared(self, a: _Actor, ctx: RenderContext, fig, field) -> None:
         """`_begin` for a shared cycle: the same draws, read from the plan."""
         plan = a.plan
-        a.t_a, a.t_h, a.t_r, a.t_f = plan.t_a, plan.t_h, plan.t_r, plan.t_f
+        # The PLAN is shared so both halves get the same cycle; the speed is
+        # applied after reading it, and both halves carry the same multiplier
+        # (`ModeHost.set_speed_scale` sets every live side), so they stay
+        # identical -- which section 35 of tests/test_modes.py measures.
+        a.t_a, a.t_h = self._moving_s(plan.t_a), plan.t_h
+        a.t_r, a.t_f = self._moving_s(plan.t_r), plan.t_f
         a.h_near = fig.fit_height(field.height(), ctx.height, 1.0)
         a.h_far = a.h_near * self.FAR_FRAC
         a.h_start = a.h_far + (self.START_MAX_FRAC * a.h_near - a.h_far) * plan.hs
@@ -380,7 +446,8 @@ class AdvancingTarget(Mode):
             a.hold_xy = (left + (right - left) * u, top + (bottom - top) * plan.v)
         # The drift keeps its DIRECTION on both halves: the position mirrors, the
         # motion does not (same orientation, as for the artwork itself).
-        a.drift = plan.side * plan.speed * self.DRIFT_MAX * field.width()
+        a.drift = self._drift_px(field, plan.side, plan.speed)
+        a.speed_used = self.speed_scale            # what `respeed` rescales FROM
         a.x_lo, a.x_hi = field.left() + w_near / 2.0, field.right() - w_near / 2.0
         if a.x_hi <= a.x_lo:
             a.x_lo = a.x_hi = field.center().x()

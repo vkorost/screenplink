@@ -4077,6 +4077,21 @@ def main() -> int:
     import re as _re20
     import numpy as _np20
     from lsa.calibrate import screen as _screen20
+    from lsa.display import power as _power20
+
+    # WHY THIS TEST NOW PINS THE DISPLAY POWER STATE (2026-11-07).
+    #
+    # A blind lens and a sleeping monitor produce the SAME black frame, so for
+    # a year this branch guessed from that frame alone and guessed wrong in
+    # both directions: 2026-10-19 it blamed a healthy camera for a sleeping
+    # monitor and cycled into a wedge, and 2026-11-07 it told him his lit 4K
+    # panel was asleep because a reboot had moved the remembered name onto the
+    # camera with a blind on it.
+    #
+    # The app now asks WINDOWS, so this check has a second input and must say
+    # which world it is in. Without pinning it, the answer came from whatever
+    # the monitor of whoever runs the suite happened to be doing -- which is
+    # RULES C17 (a check pinned to the state of the world) wearing a new hat.
 
     class _FakeCombo20:
         def __init__(self):
@@ -4091,9 +4106,19 @@ def main() -> int:
         def setCurrentIndex(self, n):
             self.set_to.append(n)
 
-    def _drive20(white_max, label):
-        """Run the white-frame handler then the setup branch; return what the app did."""
+    def _drive20(white_max, label, screen_power=None):
+        """Run the white-frame handler then the setup branch; return what the app did.
+
+        `screen_power` is what WINDOWS says about the panel: power.OFF for a
+        monitor that has gone to sleep, power.ON for one that is lit, or
+        power.UNKNOWN for a machine that will not answer.
+        """
         said, cycled, closed, logs = [], [], [], []
+        _power20.force_for_test(_power20.OFF if screen_power is None else screen_power)
+        # Each case starts from a blank alert. The alert layer is STATEFUL, so
+        # without this a case that correctly raises no alert reads the previous
+        # case's one and the check passes or fails on leftovers.
+        lab.layers["alert"].title = ""
         saved = {k: getattr(lab, k) for k in ("cmb_device", "_next_camera_to_try", "_connected_device_is_virtual",
                                               "close", "_finish_screen_search", "_log", "mapping")}
         combo = _FakeCombo20()
@@ -4119,13 +4144,14 @@ def main() -> int:
             flags = (lab._blind, lab._display_dark)
             lab._calibrate_if_needed()                   # the real branch reads them
         finally:
+            _power20.force_for_test(None)
             lab.voice.say = say_was
             for k, v in saved.items():
                 setattr(lab, k, v)
         return dict(said=said, cycled=cycled, closed=closed, logs=logs, set_to=combo.set_to,
                     flags=flags, alert=lab.layers["alert"].title)
 
-    dark20 = _drive20(0, "asleep")
+    dark20 = _drive20(0, "asleep", _power20.OFF)
     check("a flash where the white frame never got bright is reported as a SLEEPING DISPLAY, not a blind camera",
           dark20["flags"] == (True, True)
           and any("ASLEEP" in l_.upper() for l_ in dark20["logs"])
@@ -4140,7 +4166,36 @@ def main() -> int:
     check("...and it tells him what to do: wake the monitor, then re-run setup (F5 toggles: twice)",
           any("wake" in l_.lower() and "F5" in l_ for l_ in dark20["logs"]))
 
-    lit20 = _drive20(200, "lit")
+    # THE OTHER HALF, 2026-11-07. The SAME black frame, but Windows says the
+    # panel is lit -- so the darkness belongs to the camera, not the monitor,
+    # and the cycling written in October must now actually be reached. This is
+    # the case that cost him a session: a reboot moved the remembered name onto
+    # the C920 with the blind over its lens.
+    blind20 = _drive20(0, "blind lens on a lit screen", _power20.ON)
+    check("the SAME black frame, but Windows says the screen is ON, is the CAMERA's fault",
+          blind20["flags"] == (True, True)
+          and not any("ASLEEP" in l_.upper() for l_ in blind20["logs"])
+          and blind20["alert"] != "THE SCREEN IS OFF OR ASLEEP",
+          f"{blind20['flags']} alert={blind20['alert']!r}")
+    check("...and it DOES advance to the next camera (the October cure is reachable at last)",
+          blind20["cycled"] == [1] and blind20["set_to"] == [0],
+          f"{blind20['cycled']} {blind20['set_to']}")
+    check("...and it does not claim the display is asleep at a lit monitor",
+          blind20["said"] == [] and blind20["closed"] == [], str(blind20["said"]))
+
+    # AND WHEN WINDOWS WILL NOT ANSWER, the old, cautious behaviour stands.
+    # This is what makes the fix safe to ship: on a machine where the power
+    # state cannot be read, nothing changes and 2026-10-19 cannot come back.
+    unknown20 = _drive20(0, "cannot ask Windows", _power20.UNKNOWN)
+    check("when Windows will not say, it falls back to REPORTING A SLEEPING DISPLAY",
+          any("ASLEEP" in l_.upper() for l_ in unknown20["logs"])
+          and unknown20["alert"] == "THE SCREEN IS OFF OR ASLEEP",
+          f"alert={unknown20['alert']!r}")
+    check("...and still does not touch the camera when it cannot tell",
+          unknown20["cycled"] == [] and unknown20["set_to"] == [],
+          "cycling cameras cannot light a screen; proving that cost three launches")
+
+    lit20 = _drive20(200, "lit", _power20.ON)
     check("a flash where the white frame DID get bright but made no difference is STILL the camera not seeing "
           "the screen ...", lit20["flags"] == (True, False)
           and any("cannot see the screen, so trying the next one" in l_ for l_ in lit20["logs"]),

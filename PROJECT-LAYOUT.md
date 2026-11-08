@@ -40,7 +40,7 @@ test that imports it in a subprocess and fails if Qt appears.
 | **`detect/`** | `laser.py`: the detector. Scores every frame as red minus the strongest of green and blue, finds blobs, tracks them across frames, and decides what is a shot. One file, because it is the hot path: it has about 14 ms per frame before 60 fps becomes 30. |
 | **`camera/`** | Opening the device and keeping it alive. `capture.py` is the capture thread, `controls.py` the exposure/gain writes (rationed: this camera has hung for minutes on one write), `devices.py` enumerates and flags virtual cameras, `evidence.py` the per-frame ring buffer that makes a shot explainable afterwards. |
 | **`calibrate/`** | Working out where the screen is and which pixel a dot maps to. `pattern.py` photographs markers the app draws, `mapping.py` fits the homography plus radial term and holds the learned sensitivity map, `screen.py` the flash-based screen search, `align.py` the drift correction, `flash.py` the full-screen flash window. |
-| **`display/`** | Everything on the target screen. `window.py` is the fullscreen window, `scene.py` composites layers, `layers.py` holds the HUD, prompts and verdict board, `splash.py` the startup art, `foreground.py` the Windows dance that makes the window actually take the screen, `winowner.py` names whatever is covering it. |
+| **`display/`** | Everything on the target screen. `window.py` is the fullscreen window, `scene.py` composites layers, `layers.py` holds the HUD, prompts and verdict board, `splash.py` the startup art, `foreground.py` the Windows dance that makes the window actually take the screen, `winowner.py` names whatever is covering it, `power.py` asks Windows whether the monitor is actually powered so a blind lens and a sleeping screen can be told apart. |
 | **`modes/`** | The drills, one module each, plus `base.py` for what they share, `menu.py` for the shoot-to-select menu, `magazine.py`, `efficiency.py` for the score, `versus.py` and `split.py` for two players, `sprite.py` for the figure artwork. A drill is a `Layer` with one extra hook, so nothing else in the app knows modes exist. |
 | **`audio/`** | `mixer.py` plays, `listener.py` hears the gun through the camera's microphone, `voice.py` speaks, `bang.py` and `fall_sounds.py` choose which sample. |
 | **`artwork/`** | Loading pictures and making them safe to draw: `load.py` forces true grey, `ceiling.py` derives the brightness cap from the darkest supplied figure, `zones.py` and `rings.py` extract scoring rings from the ink, `catalog.py` is the cast, `assets.py` is **the one place that says where every asset folder is**. |
@@ -49,9 +49,9 @@ test that imports it in a subprocess and fails if Qt appears.
 | **`director.py`**, **`routines.py`** | One run slot and the measurement routines that take it. Every hardware procedure (set an exposure, draw, wait, photograph, put it back) is a generator that yields what it is waiting for, so two of them can never interleave. |
 | **`selfcheck.py`** | Measurements in, verdict and actions out. Pure, so it is tested exhaustively. |
 
-### `app/tests/`: 52 files
+### `app/tests/`: 56 files
 
-Twenty-six suites plus six **mutation runners** and the helpers they share. No
+Thirty-two suites plus six **mutation runners** and the helpers they share. No
 suite needs a camera or a display. The mutation runners put known faults back
 into the code and fail the build unless the check written for each one goes red,
 a check that cannot fail is not a check, and this project has shipped several.

@@ -43,6 +43,10 @@ Three decisions worth knowing:
   side of the playfield from your last hit, so nobody wins a level by standing
   still.
 
+**Page Up and Page Down** set how fast this drill starts, and the setting is
+remembered for this drill alone. The five-per-cent escalation still happens on
+top of whatever you choose, and the cap below still applies.
+
 Missing costs nothing but time. Punishing a miss teaches flinching, and the clock
 punishes it already.
 
@@ -62,6 +66,10 @@ Five levels again, each five per cent faster and five per cent smaller than the
 last. The shrink is half what it was originally, because the complaint was
 precisely about small targets; and there is a floor on the radius, set from the
 measured size of the laser dot on real hardware.
+
+**Page Up and Page Down** set the speed of this drill, remembered separately
+from Escalating Ball's. It is the whole drill that moves, so all the balls shift
+together and each keeps its own level.
 
 Both ball drills draw a small target face on the ball rather than leaving it a
 plain disc. The face is drawn at a little over half the brightness ceiling and in

@@ -62,6 +62,57 @@ DEFAULT_MAGAZINE = 17      # his instruction, 2026-10-21 12:58, for every NEW
 MAGAZINE_MIN = 1
 MAGAZINE_MAX = 50          # a rifle magazine; beyond it the strip is unreadable
 
+# -- how fast a drill's targets move -----------------------------------------
+# Asked for 2026-11-07: Page Up / Page Down, remembered separately per drill.
+# A multiplier on each drill's OWN speed curve, never an absolute speed: the
+# curves were tuned against his hardware and a shared absolute would flatten
+# the difference between a bouncing ball and an advancing figure.
+#
+# The range lives HERE, with the magazine's, for the reason stated beside the
+# magazine: settings.py owns the default and the range, and nothing in modes/
+# keeps a number of its own. The FLOOR is not zero -- a drill at speed zero
+# has targets that never move, which is indistinguishable from a frozen app
+# and is the same trap as a volume key that can reach mute.
+DEFAULT_SPEED = 1.0
+SPEED_MIN = 0.25
+SPEED_MAX = 3.0
+
+
+def normalise_speed(value: Any) -> float:
+    """A usable speed multiplier, whatever was stored: clamped into
+    [SPEED_MIN, SPEED_MAX]; anything that is not a real number (missing, text,
+    a bool, NaN, an infinity) is the default. A hand-edited or corrupt value
+    costs that one preference, never the launch -- the same contract the
+    magazine and the bests are held to."""
+    if isinstance(value, bool):
+        return DEFAULT_SPEED
+    try:
+        f = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return DEFAULT_SPEED
+    if f != f or f in (float("inf"), float("-inf")):
+        return DEFAULT_SPEED
+    return max(SPEED_MIN, min(SPEED_MAX, f))
+
+
+def normalise_mode_speed(raw: Any) -> "dict[str, float]":
+    """The saved per-drill speeds, with every entry validated. Anything that is
+    not a mapping becomes an empty one; a drill whose value will not survive
+    `normalise_speed` is dropped rather than defaulted, so a drill that has
+    never been changed stays absent instead of being written at 1.0."""
+    if not isinstance(raw, dict):
+        return {}
+    out: "dict[str, float]" = {}
+    for name, value in raw.items():
+        if not isinstance(name, str) or not name:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        speed = normalise_speed(value)
+        if speed != DEFAULT_SPEED or float(value) == DEFAULT_SPEED:
+            out[name] = speed
+    return out
+
 
 def normalise_magazine(value: Any) -> int:
     """A usable magazine size, whatever was stored: clamped into
@@ -203,8 +254,33 @@ class AppSettings:
     # the file and never the launch.
     bests: dict[str, Any] = field(default_factory=dict)
 
+    # -- how fast each drill's targets move ------------------------------------
+    # `{mode name: multiplier}`, keyed by the drill's `Mode.name` and NOT by its
+    # digit. The digits were renumbered on 2026-10-18 and a hand-written table
+    # keyed on them lied for three days afterwards; a name is the drill's own
+    # identity and moves with it.
+    #
+    # A drill absent from this dict runs at DEFAULT_SPEED, so a fresh install
+    # and a drill added next year both behave without an entry existing.
+    mode_speed: dict[str, float] = field(default_factory=dict)
+
     def __post_init__(self) -> None:
         self.bests = normalise_bests(self.bests)
+        self.mode_speed = normalise_mode_speed(self.mode_speed)
+
+    def speed_for(self, name: str) -> float:
+        """The remembered multiplier for drill `name`, or the default.
+
+        THE ONE READ PATH, handed to `ModeHost.speed_provider`, so a drill
+        started any of the four ways gets the same answer (RULES E2).
+        """
+        return normalise_speed(self.mode_speed.get(name, DEFAULT_SPEED))
+
+    def set_speed_for(self, name: str, value: float) -> float:
+        """Remember `value` for drill `name` and return what was stored."""
+        speed = normalise_speed(value)
+        self.mode_speed[name] = speed
+        return speed
 
     # -- plumbing -------------------------------------------------------------
 

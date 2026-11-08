@@ -1684,6 +1684,7 @@ class KeyHelp(Layer):
          ("+ -", "volume")),
         (("D", "dark"), ("W", "white"), ("R", "red"), ("Y", "grey"),
          ("J", "move pane"), ("[ ]", "size")),
+        (("PgUp PgDn", "target speed (Escalating Ball, Bouncing Balls, Moving Target)"),),
         (("Esc", "closes the app"), ("F11", "closes the app")),
     )
 
@@ -1894,10 +1895,17 @@ class VolumeReadout(Layer):
         self.text = ""
         self.until = 0.0
 
-    def show_volume(self, text: str, now: float) -> None:
+    def show_readout(self, text: str, now: float) -> None:
+        """Put `text` up for HOLD_S. The layer is called `volume` for history;
+        it is the app's one transient readout, and the drill speed (Page Up /
+        Page Down) uses it too rather than adding a second layer that would
+        need its own palette audit against RULES B1, B1b and B10."""
         self.text = text
         self.until = now + self.HOLD_S
         self.visible = True
+
+    def show_volume(self, text: str, now: float) -> None:
+        self.show_readout(text, now)
 
     def advance(self, ctx: RenderContext) -> bool:
         if self.visible and ctx.now >= self.until:

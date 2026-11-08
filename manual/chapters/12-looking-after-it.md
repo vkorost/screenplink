@@ -21,10 +21,24 @@ mid-stream. The launcher refuses a second instance for that reason.
 | Something bright was on screen during setup | **F** |
 | The screen is cluttered | **0**, then **E** to wipe the holes |
 | You are not sure it is seeing your shots | **A**, then **Q** to re-read the verdict |
+| You rebooted and it cannot see the screen | nothing, usually. See below |
 
 A mapping measured in one camera position is valid only in that position, and
 nothing can detect after the fact that a camera has been nudged. If holes start
 landing away from the shots, that is the first thing to suspect.
+
+**After a reboot, Windows sometimes renames the cameras.** If you have more than
+one camera plugged in, a restart can move a generic name like "USB Video Device"
+from one to another, and the app remembers its camera by name. It handles this
+itself: if the camera it opened cannot see the screen flash, it asks Windows
+whether the monitor is actually powered, and if it is, it moves on to the next
+real camera and measures again. Each camera is tried once, so it cannot sit
+there cycling.
+
+What it will not do is cycle cameras when the monitor is genuinely asleep.
+Switching cameras cannot wake a screen, and letting go of a working camera to
+find that out has cost whole sessions here. If it tells you the display looks
+asleep, wake the monitor and press **F5** twice.
 
 ## Where your things are kept
 

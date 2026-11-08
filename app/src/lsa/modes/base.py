@@ -52,7 +52,9 @@ from .. import ghost as _ghost
 from .. import scorecard as _scorecard
 from ..audio.mixer import DRY_SOUND, SELECT_SOUND
 from ..display.scene import Layer, Occluder, RenderContext
-from ..settings import DEFAULT_MAGAZINE, MAGAZINE_MAX, AppSettings, normalise_magazine
+from ..settings import (DEFAULT_MAGAZINE, MAGAZINE_MAX, SPEED_MAX as _SPEED_MAX,
+                        SPEED_MIN as _SPEED_MIN, AppSettings, normalise_magazine,
+                        normalise_speed)
 from . import efficiency, versus
 
 
@@ -312,6 +314,57 @@ class Mode(Layer):
     # draw a "not ready for two players" apology. The menu predates this flag
     # and is recognised by name in the same two places.
     is_screen = False
+
+    # DOES THIS DRILL HAVE A SPEED THE SHOOTER MAY CHANGE?
+    #
+    # Asked for 2026-11-07: "I'd like to control the speed of moving balls ...
+    # we will need to record the speed in the settings so that next time it
+    # would pick up whatever is configured previously", and then "the same
+    # thing for the moving targets, but lets record the speeds separately for
+    # each mode".
+    #
+    # False unless the drill actually multiplies `speed_scale` into its own
+    # motion. A flag without the multiplication is worse than no flag: the key
+    # would report a change that never happened, which is exactly RULES C1 --
+    # a step that can quietly do nothing is worse than one that fails.
+    # `tests/test_mode_speed.py` holds the two together by measuring real
+    # travel per mode rather than reading the flag.
+    supports_speed = False
+    # The shooter's multiplier on this drill's own speed curve; 1.0 is the
+    # drill as designed. Set from the saved settings in `ModeHost._start_all`
+    # -- the ONE place every drill starts from, so a drill started by N, by a
+    # next round or by picking it from the menu all get it without anyone
+    # remembering (RULES E2) -- and again by Page Up / Page Down while it runs.
+    speed_scale = 1.0
+    # The bounds, re-exported from settings.py so a drill can read them without
+    # importing it. ONE definition lives there, beside the magazine's, because
+    # a second copy of a range is how the two drift apart (RULES C7).
+    SPEED_MIN = _SPEED_MIN
+    SPEED_MAX = _SPEED_MAX
+
+    def respeed(self, ctx: "RenderContext") -> None:
+        """The speed changed: APPLY IT TO WHAT IS ALREADY MOVING.
+
+        2026-11-07, reported within minutes of the keys shipping: "when the
+        ball is moving on screen and I press the Page Down buttons, the ball
+        continues to move with the same speed. Only when I kill that ball does
+        the next ball start to move faster."
+
+        A drill's speed function is consulted when a target is PLACED, so
+        without this a change is invisible until the thing you are looking at
+        is replaced -- which in a bouncing-ball drill can be a long time, and
+        reads as a key that does not work.
+
+        Called by `ModeHost.advance` on the next frame after a change, which
+        is where a real RenderContext exists. Default: nothing, for the drills
+        that have no speed.
+        """
+
+    @classmethod
+    def clamp_speed(cls, value: float) -> float:
+        """`value` brought inside the bounds. One definition (`normalise_speed`),
+        used by the host, by the settings load and by the keys."""
+        return normalise_speed(value)
 
     @classmethod
     def new_link(cls) -> "object | None":
@@ -918,6 +971,17 @@ def by_key(key: int) -> "type[Mode] | None":
 # ONE definition. `modes.menu` imports it for the EXIT tile; the MENU button
 # below uses the same number for the same reason, and two copies is exactly
 # how two things that must agree drift apart.
+# THE FASTEST A TARGET MAY TRAVEL, in screen widths per second. MEASURED,
+# not chosen: a 100 ms laser pulse against a target crossing faster than this
+# moves more than its own diameter during the shot, so "where it was when the
+# trigger broke" stops being well defined and a clean hit reads as a miss.
+#
+# It lives here rather than on one drill because it is a fact about the laser
+# and the camera, not about bouncing balls -- and because the shooter's
+# Page Up multiplier now pushes toward it from two drills. Two copies of one
+# measured number is how a constant drifts (RULES C7).
+LASER_SPEED_CEILING = 2.0
+
 CHROME_ARM_S = 4.0
 
 
@@ -1135,6 +1199,19 @@ class ModeHost(Layer):
         # Non-empty when two players were requested and the drill could not
         # honour it. The app reads it once, right after `set_mode`, to say so.
         self.fallback_note = ""
+        # WHERE A DRILL'S SAVED SPEED COMES FROM. The app sets this to a
+        # callable `name -> multiplier` reading `settings.mode_speed`; left
+        # None, every drill runs at 1.0, which is what the suites and the
+        # cold-start harness see.
+        #
+        # A callable rather than the settings object: the host reads a drill's
+        # speed on every start, and handing it a live `AppSettings` would give
+        # a layer a route to the file the user owns. Persisting stays with the
+        # app, which already owns the debounced save (RULES C11).
+        self.speed_provider = None
+        # Set when a speed changes; cleared on the next frame, where there is
+        # a RenderContext to re-speed the live targets with.
+        self._speed_dirty = False
         self.tallies = (_Tally(), _Tally())
         self._tally_sig: tuple = ()
         # What the app's own measurement was doing during THIS round, for the
@@ -1512,6 +1589,40 @@ class ModeHost(Layer):
         if ctx is not None:
             self._start_all(ctx)
 
+    def _apply_saved_speed(self) -> None:
+        """Give every live half the multiplier the settings remember for it."""
+        if self.speed_provider is None:
+            return
+        for mode in (self.mode, self.mode2):
+            if mode is None or not mode.supports_speed:
+                continue
+            try:
+                mode.speed_scale = mode.clamp_speed(self.speed_provider(mode.name))
+            except Exception:                                    # noqa: BLE001
+                # A broken provider must not stop a drill from starting: the
+                # drill is the point, the speed is a preference.
+                mode.speed_scale = 1.0
+
+    def set_speed_scale(self, value: float) -> "float | None":
+        """Change the live drill's speed now. Returns what was actually
+        applied (bounds are the drill's), or None if this drill has no speed.
+
+        Returning None rather than silently doing nothing is what lets the app
+        SAY so: a key that appears to work and does not is RULES C1.
+        """
+        mode = self.mode
+        if mode is None or not mode.supports_speed:
+            return None
+        applied = mode.clamp_speed(value)
+        for side in (self.mode, self.mode2):
+            if side is not None and side.supports_speed:
+                side.speed_scale = applied
+        # The targets ALREADY MOVING are re-speeded on the next frame, where
+        # a context exists. Doing it here is what the first version did not do
+        # at all, and the key looked broken (see `Mode.respeed`).
+        self._speed_dirty = True
+        return applied
+
     def restart(self, ctx: RenderContext) -> None:
         """N. Once a round is over it is the NEXT round (two players: sides swap
         and the totals carry); at any other time it restarts the round in play,
@@ -1525,6 +1636,14 @@ class ModeHost(Layer):
     def _start_all(self, ctx: RenderContext) -> None:
         if self.mode is None:
             return
+        # THE SAVED SPEED IS APPLIED HERE AND NOWHERE ELSE. Every way a drill
+        # can begin -- picking it, N mid-round, N after a round, the next round
+        # of a versus match -- arrives at this method, so a drill added later
+        # is covered without anybody remembering to call something (RULES E2,
+        # which exists because SCREEN_OWNERS ended up read by one routine in
+        # six). Both halves of a versus round get the same number: it is one
+        # drill at one difficulty, not two.
+        self._apply_saved_speed()
         if self.versus and self.mode2 is not None:
             # ONE object for the two halves, made here and nowhere else: this
             # is reached from set_mode, restart (N mid-round) and _next_round
@@ -1977,6 +2096,14 @@ class ModeHost(Layer):
         # either: a ball bouncing on a half nobody can score on would ask for
         # sixty repaints a second of a surface nobody is looking at.
         self._retire_done()
+        if self._speed_dirty:
+            # ONE place, iterating the same sides the tick does, so a drill
+            # added later is covered without anybody remembering (RULES E2).
+            self._speed_dirty = False
+            for _i, mode, sctx in self._live_sides(ctx):
+                if mode.supports_speed:
+                    mode.respeed(sctx)
+                    moved = True
         for _i, mode, sctx in self._live_sides(ctx):
             if mode.advance(sctx):
                 moved = True            # no short-circuit: both sides must tick

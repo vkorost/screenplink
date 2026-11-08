@@ -37,6 +37,10 @@ from typing import Any, Generator, Optional
 
 from . import exposure as expo
 from .director import Call, Cancelled, Control, Floor, Job, Log, Paint, Sleep, Still
+# The one home for "how faint may the app's own test dot read" is
+# lsa/watchdog.py, where its provenance is stated. selfcheck imports the same
+# constant under the name PROBE_DOT_BAD_BELOW.
+from .watchdog import ABS_BAD_BELOW as _PROBE_DOT_BAD_BELOW
 
 __all__ = ["exposure_probe", "probe_job", "self_test", "self_test_job",
            "mapping_check", "mapping_check_job", "mark_watch_check",
@@ -244,6 +248,12 @@ def exposure_probe(lab: Any) -> Generator:
                 # legitimately. Every early return below used to throw it
                 # away, which is how a reading of 5 sailed through to READY.
                 lab._probe_dot_reading = float(peak)
+                # ONE bad reading asks for a re-measure; TWO condemn the
+                # camera. Counted here, where a reading is actually taken,
+                # because the verdict is rebuilt on every C press and
+                # counting there would manufacture the repetition.
+                if float(peak) < _PROBE_DOT_BAD_BELOW:
+                    lab._probe_dot_bad_runs += 1
 
                 # NOTHING AT FULL RED MEANS THE DOT IS NOT GETTING THROUGH.
                 #

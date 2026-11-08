@@ -153,6 +153,10 @@ class SelfCheck:
     # bailed, or the camera delivered no frame): ABSENT EVIDENCE, never read
     # as a fault (RULES C1 cuts both ways).
     probe_dot: float | None = None
+    # HOW MANY PROBE RUNS THIS SESSION have read a bad dot, including this one.
+    # 1 is a reading; 2 is a repetition, and only a repetition condemns the
+    # camera. See `_camera_findings`. Zero when the probe has never run badly.
+    probe_dot_bad_runs: int = 0
 
     @property
     def rate(self) -> float:
@@ -215,19 +219,50 @@ def _camera_findings(c: SelfCheck) -> list[Finding]:
     out: list[Finding] = []
 
     if camera_not_delivering(c):
-        out.append(Finding(
-            Verdict.BLOCKED,
-            "The camera is not delivering the app's own test dot.",
-            "The app drew a full-red dot on its own screen and the camera "
-            "barely registered it. On every healthy launch that dot reads "
-            "25 or more. Any shot you fire now would go unseen, whatever "
-            "the rest of this check says.",
-            "Do not shoot. Close the app by closing its window (never "
-            "kill it), unplug the camera and plug it back in, then start "
-            "the app again. If it persists, try another USB port.",
-            f"the test dot read {c.probe_dot:.0f} at full red; "
-            f"{PROBE_DOT_BAD_BELOW:.0f} is the line, healthy is 25-97",
-        ))
+        # The measurements from THIS launch that disagree, named rather than
+        # ignored. A camera holding a confirmed mapping and a healthy frame
+        # rate is not a camera to unplug on one faint reading.
+        against = []
+        if c.fps is not None and c.fps >= 30.0:
+            against.append(f"{c.fps:.0f} fps")
+        if c.calibrated and c.held_out_mm is not None:
+            against.append(f"a confirmed mapping at {c.held_out_mm:.2f}mm")
+        contra = ("; the same launch measured " + " and ".join(against)
+                  if against else "")
+        repeated = c.probe_dot_bad_runs >= 2
+        if repeated:
+            out.append(Finding(
+                Verdict.BLOCKED,
+                "The camera is not delivering the app's own test dot.",
+                "The app drew a full-red dot on its own screen and the camera "
+                "barely registered it, TWICE. On every healthy launch that "
+                "dot reads 25 or more. One faint reading can be a passing "
+                "dip; two is the camera.",
+                "Do not shoot. Close the app by closing its window (never "
+                "kill it), unplug the camera and plug it back in, then start "
+                "the app again. If it persists, try another USB port.",
+                f"the test dot read {c.probe_dot:.0f} at full red on "
+                f"{c.probe_dot_bad_runs} runs this session; "
+                f"{PROBE_DOT_BAD_BELOW:.0f} is the line, healthy is 25-97",
+            ))
+        else:
+            out.append(Finding(
+                Verdict.DEGRADED,
+                "The app's own test dot read faint. Measure it again.",
+                "The app drew a full-red dot on its own screen and the camera "
+                "barely registered it. That is worth knowing, but it is ONE "
+                "reading and it has recovered on its own before. Note also "
+                "that a screen EMITS this dot while your laser REFLECTS off "
+                "the panel far more brightly, so your shots may well register "
+                "while this dot does not.",
+                "Press X to measure the exposure again, then C to re-run this "
+                "check. If the dot reads faint a second time, that is the "
+                "camera: close the app by its window (never kill it), then "
+                "unplug it and plug it back in.",
+                f"the test dot read {c.probe_dot:.0f} at full red; "
+                f"{PROBE_DOT_BAD_BELOW:.0f} is the line, healthy is 25-97"
+                + contra,
+            ))
 
     if c.exposure_spread is not None and c.exposure_spread < 0.25:
         out.append(Finding(

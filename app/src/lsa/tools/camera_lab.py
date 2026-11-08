@@ -915,6 +915,10 @@ class CameraLab(QMainWindow):
         # The anchor dot's reading at its ranged brightness, None until a probe
         # has actually taken one (routines.exposure_probe).
         self._probe_dot_reading: float | None = None
+        # How many probe runs this SESSION read a bad dot. One is a reading,
+        # two is the camera: see `selfcheck._camera_findings`. Declared and
+        # assigned, never reached for with getattr (C8).
+        self._probe_dot_bad_runs: int = 0
         # Setup finishes once per LAUNCH, but `_on_noise_measured` runs on
         # every accepted floor -- five times on his bench 2026-10-18. Each
         # pass used to reset the session and clear the holes layer, so his
@@ -9694,16 +9698,25 @@ class CameraLab(QMainWindow):
     # this lands on 107ms, which is where his two bracketing measurements say
     # the true value is. The cost is that it takes a few magazines to settle,
     # which is the right trade for a number that silently changes scoring.
-    LAG_STEP = 0.4
+    LAG_STEP = 0.25
+
+    # How many magazines the learned lag must rest on. A median's noise falls
+    # as 1/sqrt(n), and one magazine was not enough: simulated over 40 seeds
+    # it wandered 21.9ms, which is exactly what his bench did on 2026-11-08
+    # (107 -> 79 -> 69 -> 85 -> 74). Two magazines with the gentler step
+    # wander 9.8ms.
+    LAG_MAGAZINES = 2
 
     def _lag_samples_needed(self) -> int:
-        """A magazine's worth of qualifying shots, never fewer than the floor.
+        """Qualifying shots before the learned lag moves, never fewer than the
+        floor.
 
         READ FROM THE MAGAZINE, not typed. The suite refuses a second copy of
         that number anywhere outside settings.py, because two copies of one
         fact drift apart -- and it caught this method writing `17` by hand.
         """
-        return max(self.LAG_SAMPLES_FLOOR, int(self.settings.magazine or 0))
+        return max(self.LAG_SAMPLES_FLOOR,
+                   self.LAG_MAGAZINES * int(self.settings.magazine or 0))
 
     def _note_aim_residual(self, measured: object, near: object) -> None:
         """File one shot's implied pipeline lag, and fold it in when there are
@@ -10643,6 +10656,7 @@ class CameraLab(QMainWindow):
                                - int(getattr(self, "_selftest_rej_before", 0))),
             room_bright=getattr(self, "_room_too_bright", None),
             probe_dot=self._probe_dot_reading,
+            probe_dot_bad_runs=self._probe_dot_bad_runs,
         )
         return c
 

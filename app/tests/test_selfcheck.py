@@ -394,14 +394,50 @@ def main() -> int:
 
     for reading, label in ((5.0, "18:28 bad session"), (10.0, "18:46"),
                            (0.0, "19:00 wedged")):
-        r = assess(healthy(probe_dot=reading))
-        check(f"dot {reading:g} ({label}) is BLOCKED even with 12/12",
+        # TWO bad runs is the repetition, and condemns the camera.
+        r = assess(healthy(probe_dot=reading, probe_dot_bad_runs=2))
+        check(f"dot {reading:g} ({label}) twice is BLOCKED even with 12/12",
               r.verdict is Verdict.BLOCKED, r.summary)
         check(f"  ... and it says the camera is not delivering, with the "
               f"number", "not delivering" in words(r)
               and f"{reading:.0f}" in words(r), words(r)[:90])
         check("  ... and tells him not to shoot, with a thing he can do",
               "do not shoot" in words(r) and "unplug" in words(r))
+
+        # ONE bad run is a reading, not a verdict on the hardware. 2026-11-08:
+        # a dot of 10 blocked the launch and told him to unplug the camera;
+        # four minutes later the same exposure read 111 and his gun had been
+        # registering the whole time.
+        one = assess(healthy(probe_dot=reading, probe_dot_bad_runs=1))
+        check(f"  ... but ONCE it is not READY either -- the 2026-10-17 "
+              f"protection is kept", one.verdict is not Verdict.READY,
+              one.verdict.value)
+        # It may still MENTION the cable -- as the second step, if the dot
+        # reads faint again. What it must not do is open with "do not shoot"
+        # and send him to the hardware on one reading.
+        check("  ... it asks for another measurement first, and does not tell "
+              "him to stop shooting",
+              one.verdict is Verdict.DEGRADED
+              and "press x" in words(one) and "do not shoot" not in words(one),
+              words(one)[:110])
+        check("  ... and it says the number that worried it",
+              f"{reading:.0f}" in words(one), words(one)[:90])
+
+    # THE CONTRADICTING EVIDENCE FROM THE SAME LAUNCH IS NAMED. The project's
+    # own diagnostic order for "the app says the camera is broken" begins
+    # "cross-check the verdict against measurements in the same launch", and
+    # until 2026-11-08 nothing did (C3).
+    his = assess(healthy(probe_dot=10.0, probe_dot_bad_runs=1,
+                         fps=48.1, held_out_mm=0.75, calibrated=True))
+    check("a single faint dot names the fps that disagrees with it",
+          "48 fps" in words(his), words(his)[:150])
+    check("  ... and the mapping that disagrees with it",
+          "0.75mm" in words(his), words(his)[:150])
+    # AND THE CROSS-CHECK CAN BE ABSENT: no contradicting evidence, no claim.
+    bare = assess(healthy(probe_dot=10.0, probe_dot_bad_runs=1,
+                          fps=None, held_out_mm=None, calibrated=False))
+    check("  ... and claims neither when the launch measured neither",
+          "fps" not in words(bare).split("read 10")[-1], words(bare)[:150])
     for reading in (25.0, 44.0, 46.0, 49.0, 52.0, 97.0, 15.0):
         check(f"dot {reading:g} (healthy band, or exactly on the line) "
               f"is READY", assess(healthy(probe_dot=reading)).verdict

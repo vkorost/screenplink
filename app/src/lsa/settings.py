@@ -84,7 +84,12 @@ MAGAZINE_MAX = 50          # a rifle magazine; beyond it the strip is unreadable
 # measurement on this machine. The ceiling is deliberately well under
 # `Mode.MAX_REWIND_S`: beyond ~150ms this is not a pipeline latency any more,
 # it is a broken clock, and the hit test must not follow it there.
-PIPELINE_LAG_DEFAULT = 0.060
+# 95ms: what the self test's paint-to-detection probe measures on the
+# development bench, with no human in the loop. His own shots bracketed the
+# true figure at 107ms from both sides on 2026-11-08, so this starts close and
+# the learner has little to travel. It is a STARTING POINT, replaced by the
+# first measurement on this machine.
+PIPELINE_LAG_DEFAULT = 0.095
 PIPELINE_LAG_MIN = 0.0
 PIPELINE_LAG_MAX = 0.150
 

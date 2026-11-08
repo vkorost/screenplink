@@ -216,6 +216,45 @@ def _here(paths):
     return mine, outside
 
 
+def resolve_args(args):
+    """Map paths given on the command line onto this app's tree.
+
+    Accepts repo-relative (`app/src/lsa/settings.py`, which is what
+    `git status` prints and therefore what gets pasted), app-relative
+    (`src/lsa/settings.py`) and absolute paths. Returns the app-relative
+    paths that are real files, and separately the ones that could not be
+    mapped at all.
+
+    The second list is the point. Dropping an unmappable path and answering
+    for the rest reports LESS coverage than exists, and "(none)" is exactly
+    the answer that persuades somebody to run nothing.
+    """
+    pre = _git_prefix()
+    found, unknown = [], []
+    for raw in args:
+        q = str(raw).replace(chr(92), "/")
+        cands = []
+        p = Path(q)
+        if p.is_absolute():
+            # FIRST, because `ROOT / <absolute>` is that absolute path again:
+            # it would "resolve" to itself and be handed on un-normalised, and
+            # every later comparison is against app-relative names.
+            try:
+                cands.append(p.resolve().relative_to(ROOT).as_posix())
+            except ValueError:
+                pass
+        cands.append(q)
+        if pre and q.startswith(pre):
+            cands.append(q[len(pre):])
+        for c in cands:
+            if (ROOT / c).is_file():
+                found.append(c)
+                break
+        else:
+            unknown.append(q)
+    return found, unknown
+
+
 def self_test() -> int:
     """Prove it answers the case it was built for, and that it can say NO.
 
@@ -263,6 +302,33 @@ def self_test() -> int:
          m2 == [], m2),
         ("a covered source file is not reported unguarded",
          o3 == [], o3),
+        # 2026-11-08: the paths `git status` prints are repo-relative, and an
+        # explicit argument was never normalised, so this tool answered
+        # "(none -- nothing imports what changed)" for a settings.py change.
+        ("a repo-relative path (what git status prints) resolves",
+         resolve_args([(_git_prefix() or "") + "src/lsa/settings.py"])[0]
+         == ["src/lsa/settings.py"],
+         resolve_args([(_git_prefix() or "") + "src/lsa/settings.py"])),
+        ("an app-relative path still resolves",
+         resolve_args(["src/lsa/settings.py"])[0] == ["src/lsa/settings.py"],
+         resolve_args(["src/lsa/settings.py"])),
+        ("an absolute path resolves",
+         resolve_args([str(SRC / "lsa" / "settings.py")])[0]
+         == ["src/lsa/settings.py"],
+         resolve_args([str(SRC / "lsa" / "settings.py")])),
+        ("a backslash path resolves, because Windows pastes them",
+         resolve_args(["src" + chr(92) + "lsa" + chr(92) + "settings.py"])[0]
+         == ["src/lsa/settings.py"], None),
+        ("and it REFUSES what it cannot map rather than answering none",
+         resolve_args(["no/such/file.py"])[1] == ["no/such/file.py"],
+         resolve_args(["no/such/file.py"])),
+        # The whole point: that path must now reach real suites.
+        ("a settings.py change named by its repo-relative path reaches "
+         "test_coldstart",
+         "test_coldstart.py" in suites_for(
+             resolve_args([(_git_prefix() or "") + "src/lsa/settings.py"])[0])[0],
+         suites_for(resolve_args(
+             [(_git_prefix() or "") + "src/lsa/settings.py"])[0])[0]),
         # The ghost score's three modules are reached by the graph alone (no list
         # names them): test_ghost imports them, and modes/base.py imports all three,
         # so every suite that builds a mode reaches them too.
@@ -295,7 +361,16 @@ def main(argv) -> int:
     elif args[0] == "--changed":
         paths, outside = _here([line[3:] for line in _git(["status", "--porcelain"])])
     else:
-        paths = args
+        paths, unknown = resolve_args(args)
+        if unknown:
+            # REFUSED, not reported-around. See `resolve_args`.
+            print("CANNOT MAP THESE ONTO " + str(ROOT) + ":")
+            for u in unknown:
+                print("  " + u)
+            print("\nAnswering for the rest would under-report coverage, and")
+            print("under-reported coverage is how a suite gets skipped. Give")
+            print("paths to real files, or use --changed / --staged.")
+            return 2
     if outside:
         print("outside app/, so nothing here maps them:")
         for o in outside:

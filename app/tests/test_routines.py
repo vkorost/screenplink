@@ -641,6 +641,12 @@ class ProbeLab:
     PROBE_PEAK_LO = 25.0
     _shooting_exposure = -4.0
     _probe_floor_at = None           # the real lab declares it in __init__
+    # Mirrors the real CameraLab, which counts the probe runs that read a bad
+    # dot so a REPETITION condemns the camera and a single faint reading only
+    # asks for another measurement (C12). Declared IN THE CLASS BODY: set on
+    # ProbeLab further down the file it arrived after ThinLab had already used
+    # it, which is a stand-in that mirrors the real thing only eventually.
+    _probe_dot_bad_runs = 0
 
     #: How many times the probe asked us to keep the frames it gave up on.
     #: The stand-in MIRRORS the real lab here rather than leaving the method

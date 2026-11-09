@@ -9,4 +9,4 @@ from . import _env  # noqa: F401
 # that reports a version reads THIS -- the MCP server identifies itself with
 # it, and /health reports it beside the commit when there is a commit to
 # read, so a bug report names a build instead of saying "unknown".
-__version__ = "1.0.1"
+__version__ = "1.0.2"

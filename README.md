@@ -35,7 +35,7 @@ monitor, a Windows PC and a webcam that does 60 fps.
 
 <p align="center">
   <a href="https://github.com/vkorost/screenplink/releases/latest"><b>&#11015;&nbsp; Download for Windows</b></a>
-  &nbsp;&nbsp;v1.0.0, 230&nbsp;MB, no Python needed
+  &nbsp;&nbsp;v1.0.2, 231&nbsp;MB, no Python needed
 </p>
 
 <p align="center"><i>The trailer is what it is. The second one is the physics:

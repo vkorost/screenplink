@@ -45,7 +45,7 @@ SERVER_NAME = "screenplink"
 # heavy modules stay unimported). A seam between two copies of one fact is
 # exactly where this project has been bitten before, so test_mcp checks that
 # the two agree rather than trusting the comment.
-SERVER_VERSION = "1.0.1"
+SERVER_VERSION = "1.0.2"
 DEFAULT_PORT = 8777                 # = lsa.introspect.server.DEFAULT_PORT; a test compares
 HOST = "127.0.0.1"
 # "Not running" must be answered inside ~2 s. Measured on this Windows box: a

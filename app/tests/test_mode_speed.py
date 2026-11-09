@@ -177,11 +177,26 @@ def _move_seconds(mode, c):
     return mode._moving_s(4.0)
 
 
+def _reaction_speed(mode, c):
+    """Pixels a second the pop-up target will travel at this multiplier.
+
+    2026-11-09. This drill is the one whose speed may be ZERO, which is its
+    default and the whole of its old behaviour, so the pair this section
+    compares is 1.0x against 2.0x exactly as for the others -- zero is covered
+    on its own in section G, where standing still has to really mean a target
+    that does not move a pixel.
+    """
+    return mode._speed_px(c)
+
+
 # name -> [(what is measured, how, which way it moves when the speed goes UP)]
-# A DRILL THAT DECLARES A SPEED MUST APPEAR HERE. Section C1 enforces it.
+# A DRILL THAT DECLARES A SPEED MUST APPEAR HERE. Section C1 enforces it, and
+# it did: Reaction declared one on 2026-11-09 and this file went red in the
+# same minute, before the drill had ever been shot at.
 MEASURED: dict[str, list] = {
     "balls": [("ball speed", _balls_speed, +1)],
     "ball": [("ball speed", _ball_speed, +1)],
+    "reaction": [("pop-up target speed", _reaction_speed, +1)],
     "advancing": [("sideways drift", _drift, +1),
                   ("seconds to approach", _move_seconds, -1)],
 }
@@ -418,6 +433,182 @@ if actor.fig is not None:
 else:
     print("  [note] no figure artwork available; the advancing continuity "
           "checks were skipped")
+
+# =============================================================================
+print("\n=== G. Reaction: zero really is motionless, and a moving target is "
+      "rewound ===")
+print("    reverting the zero floor sets his pop-up target moving on a fresh "
+      "install; reverting the rewind kills its trailing edge")
+
+import math as _g_math                                          # noqa: E402
+from lsa.settings import (SPEED_ZERO_MODES, speed_default,      # noqa: E402
+                          speed_floor)
+from lsa.tools.camera_lab import CameraLab as _GLab             # noqa: E402
+
+check("reaction" in SPEED_ZERO_MODES,
+      "G1. Reaction is one of the drills that stand still until he asks")
+check(speed_floor("reaction") == 0.0 and speed_default("reaction") == 0.0,
+      "...so its floor AND its default are both zero -- the drill exactly as it "
+      "has always been", f"{speed_floor('reaction')} / {speed_default('reaction')}")
+check(speed_floor("ball") == SPEED_MIN and speed_default("ball") == DEFAULT_SPEED,
+      "...and no other drill moved: a bouncing ball at zero would read as a "
+      "frozen app, which is why the general floor is not zero")
+check(AppSettings().speed_for("reaction") == 0.0,
+      "G2. a FRESH INSTALL reads zero for Reaction, so nobody who has never "
+      "pressed the key is given a moving target")
+check(AppSettings().speed_for("ball") == DEFAULT_SPEED,
+      "...while every other drill still reads 1.0")
+
+# AND THE DRILL ITSELF IS MOTIONLESS WITH NOBODY ASKED. `Mode.speed_scale`
+# defaults to 1.0, which is right for drills designed to move; this one was
+# designed to stand still, and leaving the class default alone meant a drill
+# built DIRECTLY -- by a test, or by any path where the speed provider is
+# missing or has raised -- came up moving. test_modes found it in one run:
+# the positions, the repaint count and the two-player mirroring all shifted.
+# The settings floor is what the KEYS can reach; this is what the drill is
+# when nothing has spoken (RULES E1).
+_g_bare = type(instances["reaction"])()
+check(_g_bare.speed_scale == 0.0,
+      "G1b. a Reaction drill built with nobody asked is MOTIONLESS: the zero "
+      "lives on the drill as well as in the settings",
+      f"speed_scale={_g_bare.speed_scale}")
+# FRESH instances: section C sets the speed on the shared ones to measure the
+# effect of doubling it, so reading those here asks what a previous section did
+# rather than what the class declares.
+_g_others = [n for n, m in instances.items()
+             if m.supports_speed and n not in SPEED_ZERO_MODES
+             and type(m)().speed_scale != DEFAULT_SPEED]
+check(not _g_others,
+      "...and no other drill's class default moved", str(_g_others))
+
+_g_ladder = _GLab.speed_ladder_for("reaction")
+check(_g_ladder[0] == 0 and _g_ladder[1:] == _GLab.SPEED_LADDER,
+      "G3. the key's ladder gains a 0 rung at the bottom for this drill and is "
+      "otherwise the ladder every drill walks", str(_g_ladder[:4]))
+check(_GLab.speed_ladder_for("ball")[0] == _GLab.SPEED_LADDER[0],
+      "...and the other drills' ladder is untouched")
+check(_GLab.next_speed(25, -1, "reaction") == 0
+      and _GLab.next_speed(0, +1, "reaction") == _GLab.SPEED_LADDER[0]
+      and _GLab.next_speed(0, -1, "reaction") == 0,
+      "G4. Page Down reaches 0 and stops there; Page Up sets it moving again",
+      f"{_GLab.next_speed(25, -1, 'reaction')} / "
+      f"{_GLab.next_speed(0, +1, 'reaction')}")
+check(_GLab.next_speed(25, -1, "ball") == 25,
+      "...and Page Down cannot stop a ball drill dead")
+
+
+def _live_reaction(scale, seed=7):
+    """A Reaction drill with its target UP, at this multiplier."""
+    m = type(instances["reaction"])()
+    m.speed_scale = scale
+    c = ctx(now=100.0)
+    m.start(c)
+    # `_rng` is a read-only property onto the SHARED reveal's stream, which is
+    # the point of it: both halves of a versus round draw from one. Seed that.
+    m._reveal.rng.seed(seed)
+    t = 100.0
+    for _ in range(600):                      # past the 1.2-3.5s random wait
+        t += 1 / 60.0
+        m.advance(ctx(now=t))
+        if m.state == "live":
+            return m, t
+    return m, t
+
+
+_g_still, _g_t = _live_reaction(0.0)
+check(_g_still.state == "live", "G5. a Reaction target appears at speed zero",
+      _g_still.state)
+_g_x0, _g_y0 = _g_still.x, _g_still.y
+for _i in range(60):
+    _g_t += 1 / 60.0
+    _g_still.advance(ctx(now=_g_t))
+check((_g_still.x, _g_still.y) == (_g_x0, _g_y0),
+      "...and after a SECOND of ticking it has not moved one pixel: zero is "
+      "motionless, not slow", f"{_g_x0:.2f},{_g_y0:.2f} -> {_g_still.x:.2f},{_g_still.y:.2f}")
+check(_g_still.vx == 0.0 and _g_still.vy == 0.0,
+      "...and it was never given a heading at all")
+
+_g_fast, _g_t2 = _live_reaction(1.0)
+_g_x0, _g_y0 = _g_fast.x, _g_fast.y
+for _i in range(30):
+    _g_t2 += 1 / 60.0
+    _g_fast.advance(ctx(now=_g_t2))
+_g_moved = _g_math.hypot(_g_fast.x - _g_x0, _g_fast.y - _g_y0)
+check(_g_moved > _g_fast.r,
+      "G6. at 100% it travels further than its own radius in half a second, so "
+      "it has to be led rather than merely noticed",
+      f"moved {_g_moved:.0f}px, radius {_g_fast.r:.0f}px")
+
+# it STAYS hittable: bounces off the playfield rather than leaving ------------
+_g_in = _g_fast.playfield(ctx())
+_g_out = []
+for _i in range(1200):                        # twenty seconds of travel
+    _g_t2 += 1 / 60.0
+    _g_fast.advance(ctx(now=_g_t2))
+    if _g_fast.state != "live":
+        break
+    if not (_g_in.left() <= _g_fast.x <= _g_in.right()
+            and _g_in.top() <= _g_fast.y <= _g_in.bottom()):
+        _g_out.append((_g_fast.x, _g_fast.y))
+check(not _g_out,
+      "G7. it BOUNCES and never leaves the playfield, so the time it is "
+      "available does not depend on where it popped up",
+      f"{len(_g_out)} frames outside, first {_g_out[:1]}")
+
+# THE REWIND. This drill became a moving-target drill today, so it inherits the
+# fault that killed the ball's trailing edge on 2026-11-08 unless it inherits
+# the cure. The shot is aimed where the target WAS; the test must still score.
+#
+# THE OFFSET MUST EXCEED THE RADIUS, or this check cannot fail. The first
+# version aimed 106px behind a target with a 110px radius and the shot landed
+# inside the circle with or without the rewind: removing the rewind from the
+# drill left all 83 checks green. Measured and corrected the same minute.
+# Top speed and a longer age put the aim point more than two radii behind.
+_g_hit, _g_t3 = _live_reaction(3.0)
+_g_age = 0.120
+_g_aim_x = _g_hit.x - _g_hit.vx * _g_age
+_g_aim_y = _g_hit.y - _g_hit.vy * _g_age
+_g_ctx = ctx(now=_g_hit.shown_at + _g_age + 0.5)
+_g_ev = modes.ShotEvent(_g_aim_x, _g_aim_y, _g_ctx.now - _g_age, 1)
+_g_gap = _g_math.hypot(_g_aim_x - _g_hit.x, _g_aim_y - _g_hit.y)
+_g_r = _g_hit.r
+check(_g_gap > _g_r * 2.0,
+      "G8a. the aim point is more than TWO RADII behind the target, so a hit "
+      "test that did not rewind would have to miss it -- without this the next "
+      "check passes whether the rewind exists or not",
+      f"{_g_gap:.0f}px behind, radius {_g_r:.0f}px")
+_g_out1 = _g_hit.shot(_g_ev, _g_ctx)
+check(_g_out1.hit,
+      "G8b. ...and a shot at where the target WAS when it was fired SCORES: "
+      "the hit test rewinds the target by the shot's age, as the ball drills do",
+      f"hit={_g_out1.hit}, {_g_gap:.0f}px behind a radius of {_g_r:.0f}px")
+
+_g_miss, _g_t4 = _live_reaction(2.0)
+_g_far = _g_math.hypot(_g_miss.vx, _g_miss.vy) * _g_age
+_g_ctx2 = ctx(now=_g_miss.shown_at + _g_age + 0.5)
+_g_ev2 = modes.ShotEvent(_g_miss.x + _g_miss.r * 3.0, _g_miss.y, _g_ctx2.now - _g_age, 1)
+check(not _g_miss.shot(_g_ev2, _g_ctx2).hit,
+      "...and the check can still fail: three radii away is still a miss",
+      f"the target travels {_g_far:.0f}px in that age")
+
+# a target ALREADY UP changes pace, and can be stopped dead -------------------
+_g_live, _g_t5 = _live_reaction(1.0)
+_g_was = _g_math.hypot(_g_live.vx, _g_live.vy)
+_g_live.speed_scale = 2.0
+_g_live.respeed(ctx())
+_g_now = _g_math.hypot(_g_live.vx, _g_live.vy)
+check(_g_now > _g_was * 1.8,
+      "G9. Page Up speeds up the target ALREADY on screen, not just the next "
+      "one", f"{_g_was:.0f} -> {_g_now:.0f} px/s")
+_g_live.speed_scale = 0.0
+_g_live.respeed(ctx())
+check(_g_live.vx == 0.0 and _g_live.vy == 0.0,
+      "...and Page Down to zero stops the one on screen dead")
+_g_live.speed_scale = 1.0
+_g_live.respeed(ctx())
+check(_g_math.hypot(_g_live.vx, _g_live.vy) > 0.0,
+      "...and starting it again gives a standing target a heading")
+
 
 # =============================================================================
 owned.check(lambda ok, what, detail="": check(ok, what, detail))

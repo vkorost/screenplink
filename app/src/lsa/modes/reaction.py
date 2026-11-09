@@ -59,7 +59,7 @@ from PySide6.QtGui import QColor, QPainter, QPen
 from ..display.layers import (GREY_HI as ACCENT, GREY_HI_DIM as ACCENT_DIM,
                               GREY_MISS as COOL, GREY_HIT as GOOD, GREY_FAINT, GREY_TEXT, mono, px)
 from ..display.scene import RenderContext
-from ..audio.mixer import APPEAR_SOUND
+from ..audio.mixer import APPEAR_SOUND, POP_SOUND
 from .. import ghost
 from .base import Mode, ShotEvent, ShotOutcome, register
 
@@ -200,6 +200,33 @@ class ReactionDrill(Mode):
     summary = "A target appears without warning. How fast can you hit it?"
     animated = True            # the countdown and the flash both need ticking
 
+    # IT CAN TRAVEL, AND BY DEFAULT IT DOES NOT. Asked for 2026-11-09: "I want
+    # to be able to switch whether that target starts moving or not. Let's have
+    # the same button that controls the speed ... control whether it will move
+    # when it pops up and how fast it will move. The speed will start at zero."
+    #
+    # So Page Up / Page Down reach this drill, and the ladder they walk starts
+    # at 0 (`settings.SPEED_ZERO_MODES`), which is the drill exactly as it has
+    # always been. Nothing about the measurement changes: the clock still runs
+    # from the instant it appears to the first hit.
+    supports_speed = True
+    # ZERO ON THE CLASS, not only in the settings. `Mode.speed_scale` defaults
+    # to 1.0, which is right for every drill that was designed to move; this
+    # one was designed to stand still. Leaving the class default alone meant a
+    # drill built DIRECTLY -- by a test, or by any path where the speed
+    # provider is missing or has raised -- came up moving, and test_modes
+    # found it at once: the target's positions, its repaint count and the
+    # two-player mirroring all shifted. The settings floor is what he can
+    # reach from the keys; THIS is what the drill is when nobody has said
+    # anything (RULES E1: the same rule has to hold in every place it applies).
+    speed_scale = 0.0
+    # At 100% the target crosses this fraction of the playfield's SMALLER side
+    # every second. Picked against the radius it has to be hit at: at 0.055 of
+    # that side, 0.35 means it travels about six of its own diameters a second,
+    # which is a target you have to lead rather than one that outruns the eye.
+    # The whole range he can reach is 25% to 300% of it.
+    BASE_SPEED_FRAC = 0.35
+
     MIN_WAIT = 1.2             # seconds; shorter is unfair at 100ms pulse rates
     MAX_WAIT = 3.5             # longer than this and attention wanders
     RADIUS_FRAC = 0.055        # of the smaller playfield side
@@ -242,6 +269,12 @@ class ReactionDrill(Mode):
         self.shown_at = 0.0          # when it did appear (the reveal's one instant)
         self.x = self.y = 0.0
         self.r = 10.0
+        # HOW FAST IT TRAVELS, in screen pixels a second, committed when the
+        # target goes live and zero until he asks for motion. Separate from
+        # `speed_scale` on purpose: the scale is a preference that may change
+        # mid-flight, and these are the velocity the thing on screen actually
+        # has, which is what the hit test has to rewind by.
+        self.vx = self.vy = 0.0
         self.flashes: list[tuple[float, float, float, float]] = []
         self.started_at = 0.0
         # ALWAYS a reveal object, one seat by default, so single player and
@@ -406,6 +439,7 @@ class ReactionDrill(Mode):
                 and self.seat not in link.resolved):
             self.x, self.y = self._cand
             self.r = self._cand_r
+            self._launch(ctx)
             self.state = "live"
             self.shown_at = link.live_at       # ONE origin for both seats
             # The ghost's record: hittable from this instant, on the clock the
@@ -423,6 +457,81 @@ class ReactionDrill(Mode):
             self._queued_sound = APPEAR_SOUND
             changed = True
         return changed
+
+    # -- the motion, which is off unless he has asked for it ------------------
+
+    def _speed_px(self, ctx: RenderContext) -> float:
+        """Pixels a second at the current multiplier. Zero means stationary,
+        which is the default and the whole of the old behaviour."""
+        inner, _far, _r = self._geometry(ctx)
+        side = min(inner.width(), inner.height())
+        if side <= 0:
+            return 0.0
+        return self.BASE_SPEED_FRAC * side * max(0.0, float(self.speed_scale))
+
+    def _launch(self, ctx: RenderContext) -> None:
+        """Give the target that is about to appear its heading.
+
+        THE RANDOM STREAM IS UNTOUCHED AT ZERO SPEED. `self._rng` is the
+        drill's one seedable stream and its draw order is part of this
+        module's contract -- the wait, then x, then y, then any redraws -- so
+        an angle drawn unconditionally would shift every position this drill
+        has ever produced from a given seed. At speed zero, which is the
+        default and what every existing test runs at, nothing is drawn and
+        nothing moves.
+        """
+        speed = self._speed_px(ctx)
+        if speed <= 0.0:
+            self.vx = self.vy = 0.0
+            return
+        angle = self._rng.uniform(0.0, 2.0 * math.pi)
+        self.vx, self.vy = speed * math.cos(angle), speed * math.sin(angle)
+
+    def respeed(self, ctx: RenderContext) -> None:
+        """Page Up / Page Down while a target is UP changes the one on screen.
+
+        The 2026-11-07 lesson, reported within minutes of the speed keys
+        shipping: a drill that only consults its speed when a target is PLACED
+        reads as a key that does not work. Here it also has to be able to start
+        a standing target moving and to stop a moving one dead, because zero is
+        a legal speed for this drill and not a frozen app.
+        """
+        if self.state != "live":
+            return
+        speed = self._speed_px(ctx)
+        if speed <= 0.0:
+            self.vx = self.vy = 0.0
+            return
+        now = math.hypot(self.vx, self.vy)
+        if now <= 1e-9:
+            self._launch(ctx)            # it was standing still: give it a heading
+            return
+        k = speed / now                  # same heading, new pace
+        self.vx, self.vy = self.vx * k, self.vy * k
+
+    def _drift(self, ctx: RenderContext) -> bool:
+        """Move the live target and bounce it off the inside of the playfield.
+
+        It stays hittable for the whole exposure, which is what keeps the
+        drill's own measurement -- time from appearance to first hit -- the
+        same quantity at every speed. A target that left the screen early
+        would make the time available depend on where it happened to appear.
+        """
+        if self.state != "live" or (self.vx == 0.0 and self.vy == 0.0):
+            return False
+        inner, _far, _r = self._geometry(ctx)
+        dt = max(0.0, min(0.25, float(ctx.dt)))      # a stall must not teleport it
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+        if self.x < inner.left():
+            self.x, self.vx = inner.left(), abs(self.vx)
+        elif self.x > inner.right():
+            self.x, self.vx = inner.right(), -abs(self.vx)
+        if self.y < inner.top():
+            self.y, self.vy = inner.top(), abs(self.vy)
+        elif self.y > inner.bottom():
+            self.y, self.vy = inner.bottom(), -abs(self.vy)
+        return True
 
     def advance(self, ctx: RenderContext) -> bool:
         link = self._reveal
@@ -448,6 +557,10 @@ class ReactionDrill(Mode):
                     self._validate(ctx)
                 link.try_live(ctx.now)
                 busy = self._sync(ctx) or busy
+        # The target travels only if he has asked it to; at the default speed
+        # of zero this returns False and the repaint budget below is exactly
+        # what it was.
+        busy = self._drift(ctx) or busy
         if self.flashes:
             before = len(self.flashes)
             self.flashes = [f for f in self.flashes
@@ -486,12 +599,29 @@ class ReactionDrill(Mode):
             self.false_starts += 1
             self.flashes.append((ev.x, ev.y, ev.t, 0.0))
             return ShotOutcome(hit=False, target_id="false-start")
-        if math.hypot(ev.x - self.x, ev.y - self.y) > self.r:
+        # WHERE IT WAS WHEN HE FIRED, not where it is now. A shot is reported
+        # after the detector has confirmed it, and the display and the camera
+        # pipeline both happened before that, so a target moving at this
+        # drill's top speed has travelled several of its own radii since the
+        # picture he aimed at. Testing the drawn position killed the trailing
+        # edge of the ball on 2026-11-08 -- clean hits on the back of it
+        # scored nothing -- and this drill became a moving-target drill today,
+        # so it inherits that fault unless it inherits the cure.
+        #
+        # `Mode.shot_age` is that cure, and it is ONE definition: the age the
+        # app can see plus the measured pipeline lag. At zero speed the
+        # rewind is zero and this is the test it has always been.
+        age = self.shot_age(ev, ctx)
+        tx, ty = self.x - self.vx * age, self.y - self.vy * age
+        if math.hypot(ev.x - tx, ev.y - ty) > self.r:
             return ShotOutcome.miss()
         took = max(0.0, ev.t - self.shown_at)
         self.times.append(took)
         self.hits += 1
-        self.flashes.append((self.x, self.y, ev.t, took))
+        # The flash marks WHERE HE HIT IT, which is the rewound position and
+        # not where the target had drifted to by the time the shot was
+        # reported. At zero speed the two are the same point.
+        self.flashes.append((tx, ty, ev.t, took))
         self.state = "wait"
         self._released_at = ev.t
         self._reveal.resolve(self.seat)
@@ -501,7 +631,15 @@ class ReactionDrill(Mode):
         # Points fall with time: 10 for a quarter-second, 1 for over a second
         # and a half. The number is decoration -- the time is the measurement.
         points = reaction_points(took)
-        return ShotOutcome(hit=True, points=points, target_id="reaction")
+        # THE SAME SOUND THE BALL DRILLS USE, his instruction 2026-11-09:
+        # "let's just add the same sound as the escalating ball has". A short
+        # quiet sample of his own was tried first and could not be heard: it
+        # sits 10.4 dB under the 9mm bang and, at 0.305 s, fits entirely inside
+        # the bang's loud part. The glass break escapes that by running 1.541 s
+        # and sounding on after the bang decays, which is why it works here
+        # too. It FOLLOWS the gunshot and never replaces it.
+        return ShotOutcome(hit=True, points=points, target_id="reaction",
+                           sound=POP_SOUND)
 
     def status(self) -> str:
         if not self.times:

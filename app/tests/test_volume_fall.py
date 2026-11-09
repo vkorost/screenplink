@@ -167,6 +167,122 @@ check(_cto.hit and _cto.sound == mixer_mod.VANISH_SOUND,
       "Clear The Board: a hit still asks for the vanish pop (the circle really is destroyed)",
       f"hit={_cto.hit} sound={_cto.sound}")
 
+# THE REACTION TARGET, HIT (2026-11-09, his request: "add the sound ... when the
+# 'reaction' ball is hit similar to what we have when the escalation ball is
+# hit"). Pinned HERE because this is the file that already holds which drill
+# asks for which sound, and a sound added without a check is a sound that can
+# be reverted in silence.
+#
+# Driven through the real drill: the target has to actually be LIVE, because a
+# hit on a drill that is still waiting is a false start and asks for nothing.
+_rx = modes.by_key(Qt.Key_4)()
+_rxc = fh.context(now=200.0)
+_rx.start(_rxc)
+_rxt = 200.0
+for _ in range(600):                       # past the 1.2-3.5 s random wait
+    _rxt += 1 / 60.0
+    _rx.advance(fh.context(now=_rxt))
+    if _rx.state == "live":
+        break
+check(_rx.state == "live", "Reaction: the target came up so a hit can be tested",
+      _rx.state)
+_rxo = _rx.shot(modes.ShotEvent(_rx.x, _rx.y, _rxt, 1), fh.context(now=_rxt))
+check(_rxo.hit and _rxo.sound == mixer_mod.POP_SOUND,
+      "Reaction: hitting the pop-up target asks for the SAME glass break the "
+      "ball drills use -- his ruling, 2026-11-09",
+      f"hit={_rxo.hit} sound={_rxo.sound}")
+# WHY NOT A SOUND OF ITS OWN: one was tried and could not be heard. It is
+# 10.4 dB below the 9mm bang and 0.305 s long, so it plays entirely inside the
+# bang's loud part; the glass break escapes that by running 1.541 s, not by
+# being louder. This check keeps the reason attached to the code.
+_pick_file = mixer_mod.Mixer.RESERVED_FILES.get("freesound_community-pick-92276")
+check(_pick_file is not None
+      and _pick_file.startswith(mixer_mod.Mixer.RESERVED_PREFIX),
+      "the sample that was tried and dropped is still RESERVED, so the gunshot "
+      "picker can never draw it as an ordinary bang",
+      f"{_pick_file} -- that is how a five-second cinematic boom was once "
+      f"drawn as one")
+_pick_played = [m for m in dir(mixer_mod) if m.startswith("REACTION_HIT")]
+check(not _pick_played,
+      "...and nothing names it as a hit sound any more, so it cannot be played "
+      "by accident", str(_pick_played))
+
+# WHAT IT COSTS THE MICROPHONE, measured and printed rather than assumed. The
+# app goes deaf for its own bang plus the effect, and the microphone is the one
+# channel that counts his trigger pulls independently of the camera. This drill
+# is the tightest case in the app: the gap between a hit and the next target is
+# 1.2 s at its shortest.
+import soundfile as _rx_sf                                  # noqa: E402
+from lsa.artwork import assets as _rx_assets                # noqa: E402
+
+_rx_path = _rx_assets.asset_dir("sounds") / "11325622-glass-breaking-sound-effect-240679.mp3"
+_rx_data, _rx_sr = _rx_sf.read(str(_rx_path), always_2d=True)
+_rx_len = len(_rx_data) / float(_rx_sr)
+print(f"     MEASURED: the Reaction hit sound (the ball drills' glass break) is "
+      f"{_rx_len:.3f}s; this drill's shortest gap to the next target is "
+      f"{_rx.MIN_WAIT:.1f}s")
+# IT CAN OVERLAP THE NEXT REVEAL, and that is a known, bounded cost of HIS
+# choice rather than something to assert away. The waits are 1.2-3.5 s, so on
+# the shortest of them the glass break's tail runs into the next target's
+# appear cue by up to the figure printed here. The ball drills live with the
+# same sound and the same tail; what must stay true is that it always ends
+# before the LATEST the next target can arrive, so the overlap can never
+# accumulate from one reveal to the next.
+_rx_overlap = max(0.0, _rx_len - _rx.MIN_WAIT)
+print(f"     MEASURED: on the shortest wait the hit sound overlaps the next "
+      f"reveal by {_rx_overlap:.3f}s; on the longest it finishes "
+      f"{_rx.MAX_WAIT - _rx_len:.3f}s clear")
+check(_rx_len < _rx.MAX_WAIT,
+      "the hit sound always ends before the LATEST the next target can appear, "
+      "so an overlap can never carry from one reveal into the next",
+      f"{_rx_len:.3f}s against {_rx.MAX_WAIT:.1f}s")
+check(_rx_overlap < 0.5,
+      "...and on the shortest wait the overlap stays under half a second",
+      f"{_rx_overlap:.3f}s")
+
+# NO SHIPPED SOUND MAY START WITH PADDING, and this sweep is here because the
+# file above arrived with half a second of silence in front of it. Played as
+# supplied, the hit would have been heard 0.505 s after the shot -- in the one
+# drill that exists to measure that interval -- and the symptom would have read
+# as lag in the detector rather than as padding in an MP3. A sample is chosen
+# by ear from a library; nobody opens it to look at where the waveform starts.
+#
+# EVERY sound, not the one that was wrong: this applies to the gunshot most of
+# all, where leading silence is dead time between the trigger and the bang.
+# 0.25 s is the bar, and it is DERIVED -- the worst file shipping today is the
+# revolver at 0.221 s, so the bar passes everything that is here and catches
+# the class of fault that was found. The number it prints is the thing to read.
+_lead_rows = []
+for _lead_p in sorted(_rx_assets.asset_dir("sounds").glob("*.mp3")):
+    try:
+        _ld, _lsr = _rx_sf.read(str(_lead_p), always_2d=True)
+    except Exception as _exc:                                    # noqa: BLE001
+        check(False, f"every shipped sound can be read: {_lead_p.name}", str(_exc))
+        continue
+    import numpy as _lnp                                          # noqa: E402
+    _lm = _lnp.abs(_ld).max(axis=1)
+    _lpk = float(_lm.max())
+    if _lpk <= 0.0:
+        check(False, f"{_lead_p.name} is not silent", "a silent sample plays nothing")
+        continue
+    _lidx = _lnp.nonzero(_lm > _lpk * (10.0 ** (-60.0 / 20.0)))[0]
+    _lead_rows.append((_lidx[0] / float(_lsr), _lead_p.name, len(_ld) / float(_lsr)))
+_lead_rows.sort(reverse=True)
+_worst_lead, _worst_name, _worst_len = _lead_rows[0]
+print(f"     MEASURED: {len(_lead_rows)} shipped sounds; the most leading "
+      f"silence is {_worst_lead:.3f}s in {_worst_name}")
+check(_worst_lead <= 0.25,
+      "NO SHIPPED SOUND STARTS WITH PADDING: the loudest part of every sample "
+      "begins within a quarter second, so a sound cannot arrive long after the "
+      "thing it describes",
+      f"{_worst_name} waits {_worst_lead:.3f}s before it makes a noise")
+_pick_lead = next(l for l, n, _x in _lead_rows
+                  if n == "freesound_community-pick-92276.mp3")
+check(_pick_lead <= 0.05,
+      "...and the Reaction hit sound in particular starts at once, which is the "
+      "whole reason it was cut: as supplied it waited 0.505s",
+      f"{_pick_lead:.3f}s")
+
 print("4. in the app: the bang, the fallback, the mute, the keys, the persistence")
 import lsa.settings as _settings                          # noqa: E402
 import lsa.tools.camera_lab as cl                         # noqa: E402

@@ -135,29 +135,68 @@ DEFAULT_SPEED = 1.0
 SPEED_MIN = 0.25
 SPEED_MAX = 3.0
 
+# DRILLS WHOSE TARGETS DO NOT MOVE UNLESS HE ASKS. Added 2026-11-09 for
+# Reaction: "I want to be able to switch whether that target starts moving or
+# not... The speed will start at zero and then it should be possible to just
+# make it move faster as soon as it pops up."
+#
+# For these the floor AND the default are both zero, and the two have to be the
+# same number: zero is the drill as it has always been, so a fresh install, an
+# install that has never pressed the key, and one that has walked the speed
+# back down must all land on a target that stands still.
+#
+# The general floor is NOT zero and stays that way for every other drill, for
+# the reason written beside SPEED_MIN: a bouncing ball at speed zero is
+# indistinguishable from a frozen app. A target that was never meant to move is
+# a different case, and this set is the difference. Named by the same key
+# `mode_speed` uses, so there is no second spelling of a drill's name.
+SPEED_ZERO_MODES = frozenset({"reaction"})
 
-def normalise_speed(value: Any) -> float:
+
+def speed_floor(name: "str | None" = None) -> float:
+    """The slowest `name` may go. Zero only for the drills that stand still."""
+    return 0.0 if name in SPEED_ZERO_MODES else SPEED_MIN
+
+
+def speed_default(name: "str | None" = None) -> float:
+    """What `name` runs at when nothing has been saved for it."""
+    return 0.0 if name in SPEED_ZERO_MODES else DEFAULT_SPEED
+
+
+def normalise_speed(value: Any, name: "str | None" = None) -> float:
     """A usable speed multiplier, whatever was stored: clamped into
-    [SPEED_MIN, SPEED_MAX]; anything that is not a real number (missing, text,
-    a bool, NaN, an infinity) is the default. A hand-edited or corrupt value
-    costs that one preference, never the launch -- the same contract the
-    magazine and the bests are held to."""
+    [speed_floor(name), SPEED_MAX]; anything that is not a real number
+    (missing, text, a bool, NaN, an infinity) is that drill's default. A
+    hand-edited or corrupt value costs that one preference, never the launch --
+    the same contract the magazine and the bests are held to.
+
+    `name` is optional and defaults to the behaviour this function had before
+    the zero-speed drills existed, so every caller that does not know which
+    drill it is holding is unaffected by construction.
+    """
+    default = speed_default(name)
     if isinstance(value, bool):
-        return DEFAULT_SPEED
+        return default
     try:
         f = float(value)
     except (TypeError, ValueError, OverflowError):
-        return DEFAULT_SPEED
+        return default
     if f != f or f in (float("inf"), float("-inf")):
-        return DEFAULT_SPEED
-    return max(SPEED_MIN, min(SPEED_MAX, f))
+        return default
+    return max(speed_floor(name), min(SPEED_MAX, f))
 
 
 def normalise_mode_speed(raw: Any) -> "dict[str, float]":
     """The saved per-drill speeds, with every entry validated. Anything that is
     not a mapping becomes an empty one; a drill whose value will not survive
     `normalise_speed` is dropped rather than defaulted, so a drill that has
-    never been changed stays absent instead of being written at 1.0."""
+    never been changed stays absent instead of being written at 1.0.
+
+    The value each entry is judged against is THAT DRILL'S default, not the
+    global one: a saved `reaction: 0.0` is the zero-speed drills' default and
+    has to survive being written, while a junk value for the same drill still
+    has to be dropped.
+    """
     if not isinstance(raw, dict):
         return {}
     out: "dict[str, float]" = {}
@@ -166,8 +205,8 @@ def normalise_mode_speed(raw: Any) -> "dict[str, float]":
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             continue
-        speed = normalise_speed(value)
-        if speed != DEFAULT_SPEED or float(value) == DEFAULT_SPEED:
+        speed = normalise_speed(value, name)
+        if speed != speed_default(name) or float(value) == speed_default(name):
             out[name] = speed
     return out
 
@@ -336,12 +375,16 @@ class AppSettings:
 
         THE ONE READ PATH, handed to `ModeHost.speed_provider`, so a drill
         started any of the four ways gets the same answer (RULES E2).
+
+        The default is the DRILL'S, so a drill that stands still until he asks
+        (`SPEED_ZERO_MODES`) reads zero on a fresh install rather than setting
+        off at full speed the first time it is played.
         """
-        return normalise_speed(self.mode_speed.get(name, DEFAULT_SPEED))
+        return normalise_speed(self.mode_speed.get(name, speed_default(name)), name)
 
     def set_speed_for(self, name: str, value: float) -> float:
         """Remember `value` for drill `name` and return what was stored."""
-        speed = normalise_speed(value)
+        speed = normalise_speed(value, name)
         self.mode_speed[name] = speed
         return speed
 

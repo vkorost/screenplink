@@ -2011,6 +2011,32 @@ class ExitConfirm(Layer):
     BOX_PAD_FRAC = 0.006        # of the screen width, around the chosen answer
     BOX_STROKE_FRAC = 0.0009    # as on the Keyboard Shortcuts screen
     BOX_RADIUS_FRAC = 0.003
+    # THE PANEL IT STANDS ON. Added 2026-11-09 after he shot a round and
+    # pressed Escape: the dialog was text only, and over the end-of-round
+    # screen "EXIT SCREENPLINK?" landed on top of "EFFICIENCY 1.61" and YES/NO
+    # on top of "SCORE 820". Both unreadable. "The dialog should not be
+    # transparent."
+    #
+    # A FILL IS NORMALLY THE FORBIDDEN THING HERE (RULES B1b: no more than 2%
+    # of the screen above luminance 60 while shooting is possible), and this
+    # one is allowed because it is DARK. At luminance 10 it is below the
+    # threshold, so it costs nothing -- and it HIDES whatever was under it, so
+    # the pair measures LESS than the dialog did alone. It is also the best
+    # possible ground for the detector: a 650nm dot on near-black is the
+    # highest red excess this app can produce.
+    #
+    # Opaque, never a veil over the whole screen. The 59% black veil the
+    # verdict board used to paint is the thing B3 is about: it dimmed every
+    # bullet hole on the screen and he reported holes that were being drawn.
+    # A SQUARE PANEL, not a rounded one. The first version rounded the corners
+    # and the opacity check went red at 4K and not at 1080p: a rounded fill
+    # leaves the four corners of its own bounding box unpainted, and at 4K the
+    # end screen's text reached into them -- 2688 pixels of the round's score
+    # reading through the question, which is the fault being fixed. The corner
+    # is the one part of a rounded panel that cannot be opaque. The NEXT ROUND
+    # box on the end screen is a square too.
+    PANEL_PAD_X_FRAC = 0.022    # of the screen width
+    PANEL_PAD_Y_FRAC = 0.028    # of the screen height
 
     SELECT_KEYS_YES = (Qt.Key_Left, Qt.Key_Y)
     SELECT_KEYS_NO = (Qt.Key_Right, Qt.Key_N)
@@ -2095,21 +2121,60 @@ class ExitConfirm(Layer):
                       cy + m_ans.height() + gap,
                       m_hint.horizontalAdvance(self.HINT), m_hint.height())
         chosen = (yes if self.yes else no).adjusted(-pad, -pad / 2.0, pad, pad / 2.0)
-        return {"title": title, "yes": yes, "no": no, "hint": hint, "box": chosen}
+
+        # The panel encloses everything this layer draws, so nothing of the
+        # screen underneath can show through between the rows. Derived from the
+        # rows themselves rather than given a size of its own: a panel sized by
+        # hand is a second description of the layout, and it goes wrong the
+        # first time a string changes length.
+        rows = (title, yes, no, hint, chosen)
+        left = min(r.left() for r in rows) - ctx.width * self.PANEL_PAD_X_FRAC
+        right = max(r.right() for r in rows) + ctx.width * self.PANEL_PAD_X_FRAC
+        top = min(r.top() for r in rows) - ctx.height * self.PANEL_PAD_Y_FRAC
+        bottom = max(r.bottom() for r in rows) + ctx.height * self.PANEL_PAD_Y_FRAC
+        panel = QRectF(left, top, right - left, bottom - top)
+        return {"title": title, "yes": yes, "no": no, "hint": hint,
+                "box": chosen, "panel": panel}
+
+    @staticmethod
+    def panel_colour() -> QColor:
+        """The app's own dark background, read from `SolidBackground`'s preset
+        rather than typed again here. One definition of that colour, so a change
+        to it cannot leave this panel a different black from the screen."""
+        return QColor(SolidBackground.PRESETS[Qt.Key_D][1])
 
     def paint(self, p: QPainter, ctx: RenderContext) -> None:
         if not self.visible or ctx.calibrating or ctx.diagnostics.get("measuring"):
             return
         box = self.layout(ctx)
+
+        # THE PANEL FIRST, opaque, so nothing underneath reads through the
+        # question. Whatever the background is -- and D, W, R and Y switch it
+        # to white, red and grey for detector testing -- the dialog stands on
+        # its own known dark ground, so its greys are legible without this
+        # layer having to flip its palette with the screen.
+        stroke = max(1.0, ctx.width * self.BOX_STROKE_FRAC)
+        # ANTIALIASING OFF FOR THE FILL, and the rect aligned to whole pixels.
+        # With it on, the fill's fractional edge is BLENDED with whatever is
+        # underneath, and the opacity check found exactly that: 896 pixels of
+        # the end-of-round screen reading through the panel's top edge row at
+        # 4K. A rectangle has no curves, so the hint buys nothing here and
+        # costs the one property this panel exists for.
+        p.setRenderHint(QPainter.Antialiasing, False)
+        p.setPen(Qt.NoPen)
+        p.setBrush(self.panel_colour())
+        p.drawRect(box["panel"].toAlignedRect())
         p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(GREY_MID, stroke))
+        p.drawRect(box["panel"].adjusted(stroke / 2.0, stroke / 2.0,
+                                         -stroke / 2.0, -stroke / 2.0))
 
         # The chosen answer is named by an OUTLINE and by being the brightest
         # thing here, never by colour: the detector scores red excess and a
         # highlight with a hue in it is a highlight that fires the gunshot.
-        stroke = max(1.0, ctx.width * self.BOX_STROKE_FRAC)
+        p.setRenderHint(QPainter.Antialiasing, True)   # back on for the glyphs
         radius = ctx.width * self.BOX_RADIUS_FRAC
         half = stroke / 2.0
-        p.setRenderHint(QPainter.Antialiasing, True)
         p.setPen(QPen(GREY_HIT, stroke))
         p.drawRoundedRect(box["box"].adjusted(half, half, -half, -half), radius, radius)
 

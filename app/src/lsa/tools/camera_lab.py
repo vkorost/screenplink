@@ -141,7 +141,8 @@ from lsa.display.window import TargetWindow                                   # 
 from lsa.settings import (MAGAZINE_KEY_MAX, MAGAZINE_KEY_MIN,  # noqa: E402
                           MAGAZINE_KEY_STEP, MAGAZINE_MAX, MAGAZINE_TOPUP,
                           AppSettings, normalise_magazine,
-                          normalise_pipeline_lag, normalise_players)
+                          normalise_pipeline_lag, normalise_players,
+                          speed_floor as _speed_floor)
 from lsa.bests import BestBook                                                # noqa: E402
 from lsa.director import Director, QtClock                                     # noqa: E402
 from lsa import routines                                                       # noqa: E402
@@ -11985,14 +11986,32 @@ class CameraLab(QMainWindow):
     SPEED_LADDER = (25, 35, 50, 70, 85, 100, 120, 140, 170, 200, 250, 300)
 
     @classmethod
-    def next_speed(cls, current_pct: int, direction: int) -> int:
+    def speed_ladder_for(cls, name: "str | None") -> tuple:
+        """The rungs THIS drill may walk.
+
+        A drill that stands still until he asks for motion gets a 0 rung on the
+        bottom, and that rung is where it starts: Reaction, 2026-11-09. Every
+        other drill keeps the ladder it had, whose floor is deliberately not
+        zero because a bouncing ball at zero reads as a frozen app.
+
+        The 0 is NOT typed here twice: `settings.speed_floor` owns which drills
+        may reach it, and this asks.
+        """
+        floor = _speed_floor(name)
+        return ((0,) + cls.SPEED_LADDER) if floor <= 0.0 else cls.SPEED_LADDER
+
+    @classmethod
+    def next_speed(cls, current_pct: int, direction: int,
+                   name: "str | None" = None) -> int:
         """The next rung up (+1) or down (-1) from `current_pct`, clamped.
 
         Pure and classmethod for the same reason `next_volume` is: the rungs
         can then be walked end to end by a test without a window, a camera or
-        a drill (tests/test_mode_speed.py).
+        a drill (tests/test_mode_speed.py). `name` is optional and omitting it
+        gives the ladder this function had before the zero-speed drills
+        existed, so every existing caller is unaffected by construction.
         """
-        ladder = cls.SPEED_LADDER
+        ladder = cls.speed_ladder_for(name)
         if direction > 0:
             for v in ladder:
                 if v > current_pct:
@@ -12002,6 +12021,18 @@ class CameraLab(QMainWindow):
             if v < current_pct:
                 return v
         return ladder[0]
+
+    @staticmethod
+    def _speed_drills() -> str:
+        """The drills that have a speed, in menu order, read from the registry
+        so this sentence cannot go stale (RULES C7)."""
+        names = [cls.title for cls, _key in arcade.registered()
+                 if getattr(cls, "supports_speed", False)]
+        if not names:
+            return "no drill at present"
+        if len(names) == 1:
+            return names[0]
+        return ", ".join(names[:-1]) + " and " + names[-1]
 
     def _step_speed(self, direction: int) -> None:
         """One press of Page Up or Page Down: change the live drill's speed,
@@ -12019,16 +12050,20 @@ class CameraLab(QMainWindow):
 
         if mode is None or not getattr(mode, "supports_speed", False):
             what = getattr(mode, "title", "") or "this screen"
+            # THE DRILLS NAMED HERE ARE READ FROM THE REGISTRY, never typed.
+            # A hand-written list of three was right for two days and would
+            # have been wrong the moment Reaction gained a speed; the key
+            # legend in this project already spent three days advertising a
+            # drill that had been removed.
             self._log(f"speed: {what} has no targets whose speed can be changed "
-                      f"(Page Up / Page Down work in Escalating Ball, Bouncing "
-                      f"Balls and Moving Target).")
+                      f"(Page Up / Page Down work in {self._speed_drills()}).")
             if ro is not None and shootable:
                 ro.show_readout(f"{what.upper()} HAS NO SPEED", time.perf_counter())
                 self.scene.mark_dirty()
             return
 
         before = int(round(self.settings.speed_for(mode.name) * 100))
-        target = self.next_speed(before, direction)
+        target = self.next_speed(before, direction, mode.name)
         applied = host.set_speed_scale(target / 100.0)
         if applied is None:                      # the drill changed under us
             return
@@ -12036,10 +12071,14 @@ class CameraLab(QMainWindow):
         self._schedule_save()
 
         end = ""
-        if target == self.SPEED_LADDER[-1] and direction > 0:
+        ladder = self.speed_ladder_for(mode.name)
+        if target == ladder[-1] and direction > 0:
             end = "  (fastest)"
-        elif target == self.SPEED_LADDER[0] and direction < 0:
-            end = "  (slowest)"
+        elif target == ladder[0] and direction < 0:
+            # A drill that may stop says STOPPED rather than "slowest": zero is
+            # a state, not a rung near the bottom, and for Reaction it is the
+            # drill as it has always been.
+            end = "  (STOPPED)" if ladder[0] == 0 else "  (slowest)"
         self._log(f"speed: {mode.title} {before}% -> {int(round(stored * 100))}% "
                   f"(remembered for this drill only; the drill's own ceiling "
                   f"still applies)")

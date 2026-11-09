@@ -407,6 +407,57 @@ check(Scene(SessionStats()).add(ModeHost()).asks_a_question is False,
       "a layer that asks nothing says so by default, declared on `Layer` rather "
       "than reached for with a getattr default (RULES C8)")
 
+#
+# IT IS OPAQUE, and this is the check for the thing he reported. The dialog
+# was text only, and over the end-of-round screen "EXIT SCREENPLINK?" landed on
+# top of "EFFICIENCY 1.61" and YES/NO on top of "SCORE 820": both unreadable.
+# "The dialog should not be transparent."
+#
+# The property, stated so it cannot be satisfied by a panel that is merely
+# dark: INSIDE THE PANEL, what you see must not depend on what is underneath.
+# So the same screen is rendered twice, once over a busy drill and once over an
+# empty one, and the two must be IDENTICAL inside the panel.
+def with_under(cls, w: int, h: int):
+    sc = Scene(SessionStats())
+    sc.dark_background = True
+    h_ = sc.add(ModeHost())
+    d_ = sc.add(ExitConfirm())
+    if cls is not None:
+        h_.set_magazine(3)
+        h_.set_mode(cls(), ctx(w, h))
+        for i in range(3):                       # a closed round: the busiest screen
+            h_.shot(modes.ShotEvent(100.0, 1000.0, 1.0 + i * 0.01, i + 1), ctx(w, h))
+        h_.advance(ctx(w, h, now=20.0))
+    d_.ask()
+    img = QImage(w, h, QImage.Format_RGB32)
+    img.fill(0xFF0A0A0A)
+    p = QPainter(img)
+    sc.paint(p, QRect(0, 0, w, h))
+    p.end()
+    a = np.frombuffer(img.constBits(), np.uint8).reshape(
+        h, img.bytesPerLine())[:, :w * 4].reshape(h, w, 4)
+    return a.copy(), d_.layout(ctx(w, h))["panel"].toAlignedRect()
+
+
+for label, (w, h) in (("4K", (SW, SH)), ("1080p", (1920, 1080))):
+    busy, panel = with_under(modes.by_key(Qt.Key_1), w, h)
+    bare, _panel2 = with_under(None, w, h)
+    sl = (slice(panel.top(), panel.bottom() + 1),
+          slice(panel.left(), panel.right() + 1), slice(0, 3))
+    same = bool(np.array_equal(busy[sl], bare[sl]))
+    differs = int((busy[sl].astype(int) - bare[sl].astype(int) != 0).sum())
+    check(same,
+          f"{label}: OPAQUE -- inside the panel the picture is identical over a "
+          f"finished round and over an empty screen, so nothing underneath can "
+          f"read through the question", f"{differs} pixels differ")
+    # ...and it is only the panel that is covered, never the whole screen: the
+    # 59% black veil the verdict board used to paint is what RULES B3 is about.
+    outside = int((busy[:, :, :3].astype(int) - bare[:, :, :3].astype(int) != 0).sum())
+    check(outside > 0,
+          f"{label}: ...and it covers only its own panel -- the round's figures "
+          f"are still on the screen around it, not veiled",
+          f"{outside} pixels outside the panel still come from the drill")
+
 hidden = ExitConfirm()
 _r, _b, _l, ink_hidden = render(hidden, ctx())
 check(ink_hidden == 0, "hidden, it draws nothing at all")

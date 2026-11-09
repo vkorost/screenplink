@@ -109,6 +109,39 @@ FIGURE_APPEAR_SOUND = "reserved/figure-appear"
 # alike in character (same family of pop) but differ 10x in length.
 DRY_SOUND = "reserved/dry-pop"
 
+# A SHORT PLUCK, KEPT RESERVED AND PLAYED BY NOTHING. It was wired as the
+# Reaction drill's hit sound on 2026-11-09 and he ruled it out by ear the same
+# hour: "let's just add the same sound as the escalating ball has and be done
+# with it." That drill now asks for POP_SOUND like modes 2 and 3.
+#
+# WHY IT IS STILL REGISTERED: unregistered, the gunshot picker would offer it
+# as an ordinary bang. `creatorshome-sharp-pop-328170` has sat here under
+# `reserved/pop-unused` for exactly that reason since October.
+#
+# WHY IT COULD NOT BE HEARD, because the next person to try a short sample here
+# will hit the same wall. It is 10.4 dB below the 9mm bang it follows and runs
+# 0.305 s, so it plays entirely inside the bang's loud part (94% of peak at
+# 0.05 s, still 26% at 0.30 s). The glass break escapes that by being 1.541 s
+# long, not by being louder -- it is 9.3 dB down itself. **An effect sample
+# here has to outlast the gunshot, or it is not heard.** Delaying a short one
+# instead was tried and rejected by ear on the same day.
+#
+# CUT TO 0.305 s, and the measurement is the reason. The file as supplied runs
+# 1.855 s and holds 0.263 s of audible content between 0.505 s and 0.768 s:
+# HALF A SECOND OF SILENCE IN FRONT OF THE SOUND and about a second behind it.
+# Played as supplied, the hit would have been heard half a second after the
+# shot, in the one drill that exists to measure that interval -- and the symptom
+# would have looked like lag in the detector rather than padding in an MP3.
+#
+# The length mattered too: at 1.855 s it outran this drill's SHORTEST gap to the
+# next target (1.2 s), so on about a quarter of the reveals its tail would have
+# played over the appear cue the drill times from, with the microphone muted
+# into that window. At 0.305 s it is shorter than the select cue (0.405 s).
+#
+# His original is untouched in the old tree; this project already ships several
+# of his own shorter cuts of longer samples, and this is one more.
+PICK_UNUSED_SOUND = "reserved/pick-unused"
+
 # A SELECTION CUE (2026-10-20): "use 'freesound_community-080997_bullet-39735.mp3'
 # when the player hits 'menu' button or 'next round' button; the same thing for
 # hitting anything in the 'menu' mode." Played IN ADDITION to the gunshot (one
@@ -531,6 +564,10 @@ class Mixer:
         **{f"Male-Grunt-0{i}": f"reserved/grunt-{i}" for i in range(1, 7)},
         "universfield-bubble-pop-06-351337": DRY_SOUND,
         "freesound_community-080997_bullet-39735": SELECT_SOUND,
+        # RESERVED, not merely added. An unregistered sample is offered by the
+        # gunshot picker as an ordinary bang, which is how a five-second
+        # cinematic boom was once drawn as one.
+        "freesound_community-pick-92276": PICK_UNUSED_SOUND,
     }
 
     def names(self) -> list[str]:

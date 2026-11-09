@@ -363,8 +363,14 @@ class Mode(Layer):
     @classmethod
     def clamp_speed(cls, value: float) -> float:
         """`value` brought inside the bounds. One definition (`normalise_speed`),
-        used by the host, by the settings load and by the keys."""
-        return normalise_speed(value)
+        used by the host, by the settings load and by the keys.
+
+        THE DRILL'S OWN NAME IS PASSED, so a drill that stands still until he
+        asks for motion gets a floor and a default of zero and every other
+        drill keeps a floor of SPEED_MIN. The decision lives in `settings.py`
+        with the rest of the ranges; nothing here keeps a number of its own.
+        """
+        return normalise_speed(value, cls.name)
 
     @classmethod
     def new_link(cls) -> "object | None":
@@ -1705,8 +1711,10 @@ class ModeHost(Layer):
                 mode.speed_scale = mode.clamp_speed(self.speed_provider(mode.name))
             except Exception:                                    # noqa: BLE001
                 # A broken provider must not stop a drill from starting: the
-                # drill is the point, the speed is a preference.
-                mode.speed_scale = 1.0
+                # drill is the point, the speed is a preference. THE DRILL'S
+                # OWN DEFAULT, not a literal 1.0 -- a drill that stands still
+                # until he asks must not be set moving by a failure.
+                mode.speed_scale = mode.clamp_speed(None)
 
     def set_speed_scale(self, value: float) -> "float | None":
         """Change the live drill's speed now. Returns what was actually

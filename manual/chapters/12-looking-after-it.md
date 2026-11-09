@@ -2,7 +2,13 @@
 
 ## Closing it properly
 
-**Escape**, or the **Exit** tile shot twice, or `stop_screenplink.ps1`.
+**Escape**, then Enter or Space on YES. Or the **Exit** tile shot twice. Or
+`stop_screenplink.ps1`.
+
+Escape asks before it closes, so a key pressed by accident cannot end a string
+you were halfway through. A second Escape takes the question away and you are
+back in the round. **F11 closes the app without asking**, which is the way out
+if the question is ever in your way.
 
 Do not End Task it and do not force-kill it. Cutting a streaming USB camera off
 mid-transaction can hang the camera's own firmware, and then the only cure is to

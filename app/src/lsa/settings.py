@@ -42,16 +42,18 @@ def normalise_players(value: Any) -> int:
 # and each half of two-player), and how many bullets the screen draws. ONE number,
 # owned HERE and nowhere else -- an earlier round length (`versus.ROUND_SHOTS`, 20)
 # and a magazine drawn on the screen would be two copies of one fact, and the
-# bullets must always mean exactly what is left. He will expose it as a setting
-# later ("the user will be able to specify the exact mag size"); today it is read
-# from `settings.local.json` and defaults here when the key is absent.
+# bullets must always mean exactly what is left. HE SETS IT FROM THE FIRING LINE
+# since 2026-11-09 (Up / Down, see MAGAZINE_KEY_MIN below); it is saved to
+# `settings.local.json` and defaults here when the key is absent.
 DEFAULT_MAGAZINE = 17      # his instruction, 2026-10-21 12:58, for every NEW
                            # deployment. It went 17 -> 19 on 2026-10-20 and back
                            # to 17 here; both numbers were his, and this one is
                            # what a fresh install should start with. The count is
                            # his call and nothing is derived from it -- the strip
-                           # shrinks to fit rather than overflowing, and the round
-                           # ends when the magazine does, whatever it holds.
+                           # shrinks to fit, then draws as many bullets as fit
+                           # (modes/magazine.MIN_SHRINK) with the numeral still
+                           # telling the truth, and the round ends when the
+                           # magazine does, whatever it holds.
                            #
                            # It changes NOTHING on an install that has already
                            # run: `settings.local.json` carries an explicit
@@ -61,6 +63,30 @@ DEFAULT_MAGAZINE = 17      # his instruction, 2026-10-21 12:58, for every NEW
                            # with moves.
 MAGAZINE_MIN = 1
 MAGAZINE_MAX = 50          # a rifle magazine; beyond it the strip is unreadable
+
+# WHAT THE KEYS MAY SET, which is NARROWER than what the file may hold.
+# Asked for 2026-11-09: "up/down arrows to increase/decrease the size of the
+# mag (the min would be 6 the max would be 30 and that setting would be
+# remembered)". Two ranges, on purpose and not by oversight:
+#
+#   * [MAGAZINE_MIN, MAGAZINE_MAX] is what a stored or topped-up magazine may
+#     BE. It stays 1..50 because `MAGAZINE_TOPUP` adds rounds past 30 for one
+#     round at a time, and because a hand-edited file must be clamped, never
+#     refused (the min_frames lesson: a saved value beats a code default).
+#   * [MAGAZINE_KEY_MIN, MAGAZINE_KEY_MAX] is what UP and DOWN may reach. His
+#     numbers. 30 is also the largest magazine whose bullets ALL fit the strip
+#     at the floor in `modes/magazine.MIN_SHRINK` on a 16:9 screen, which is
+#     measured by `tests/test_magazine_keys.py` rather than assumed here.
+MAGAZINE_KEY_MIN = 6
+MAGAZINE_KEY_MAX = 30
+MAGAZINE_KEY_STEP = 1      # one round per press: he asked for the exact size,
+                           # and a ladder (as volume and speed use) cannot name
+                           # every number between 6 and 30
+# How many rounds the top-up key deals into the round being shot. His number,
+# 2026-11-09: "the + button to add bullets to the current mag to the current
+# session only, 10 at a time". It is NOT saved: `AppSettings.magazine` is
+# untouched, so the next round is dealt the size the strip was set to.
+MAGAZINE_TOPUP = 10
 
 # -- how fast a drill's targets move -----------------------------------------
 # Asked for 2026-11-07: Page Up / Page Down, remembered separately per drill.
@@ -228,7 +254,8 @@ class AppSettings:
     # evening survives a relaunch. Applied by the app only after setup is over;
     # `normalise_players` turns anything else into 1.
     players: int = 1
-    # Rounds per magazine; see DEFAULT_MAGAZINE. No UI yet, by his instruction.
+    # Rounds per magazine; see DEFAULT_MAGAZINE. Set from the target screen
+    # with Up / Down, within [MAGAZINE_KEY_MIN, MAGAZINE_KEY_MAX].
     magazine: int = DEFAULT_MAGAZINE
     shot_sound: str = ""           # empty = first real sample found in sounds/
     # The SPEAKER the gunshot comes out of, by name. Chosen deliberately

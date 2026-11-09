@@ -295,6 +295,25 @@ class TargetWindow(QWidget):
 
     # -- input ----------------------------------------------------------------
 
+    def request_quit(self) -> None:
+        """Close the app: the ONE route, used by F11, by Escape and by the exit
+        dialog's YES.
+
+        Hide at once so the screen is his again on the keystroke, then ask the
+        owner to shut down on the next turn of the event loop. NEVER destroy a
+        QObject from inside its own handler: emitting `cancelled` inline from a
+        fullscreen window's own callback let the owner drop the last reference,
+        PySide6 destroyed the C++ object, and the method carried on calling
+        close() on it -- exception 0xc0000409, every time anyone pressed Escape.
+
+        It is a method rather than two lines in three places because a third
+        caller arrived (the exit dialog, 2026-11-09) and "fix the one that
+        broke and leave its siblings" is the half-fix this project keeps paying
+        for (RULES E1).
+        """
+        self.hide()
+        QTimer.singleShot(0, self.quit_requested.emit)
+
     def mousePressEvent(self, ev) -> None:
         """A click on the target screen, offered to the layers. NOT a shot.
 
@@ -338,15 +357,12 @@ class TargetWindow(QWidget):
             self.update()
             return
         if key == Qt.Key_F11:
-            # Hide at once so the screen is his again on the keystroke, then
-            # ask the owner to shut down on the next turn of the event loop.
-            # NEVER destroy a QObject from inside its own handler: emitting
-            # `cancelled` inline from a fullscreen window's own callback let
-            # the owner drop the last reference, PySide6 destroyed the C++
-            # object, and the method carried on calling close() on it --
-            # exception 0xc0000409, every time anyone pressed Escape.
-            self.hide()
-            QTimer.singleShot(0, self.quit_requested.emit)
+            # F11 ALWAYS EXITS AT ONCE, and that is now load-bearing: Escape
+            # asks first (see below), so this is the one key that cannot be
+            # argued with. The menu once claimed keys it could not act on and
+            # became a trap that only F11 escaped; the exit dialog therefore
+            # claims no F11 either.
+            self.request_quit()
             return
         if key == Qt.Key_Escape:
             # ESCAPE CLOSES THE APP. His instruction, 2026-10-18: "Let's put
@@ -367,12 +383,31 @@ class TargetWindow(QWidget):
             # keyboard without leaving, which is what the old behaviour was
             # really for.
             #
-            # Same route as F11 and the EXIT tile: hide at once so the screen
-            # is his on the keystroke, then ask the owner to close on the
-            # next turn of the event loop. Never destroy a QObject from
-            # inside its own handler.
-            self.hide()
-            QTimer.singleShot(0, self.quit_requested.emit)
+            # AND SINCE 2026-11-09 IT ASKS FIRST. His instruction: Escape
+            # raises a YES/NO dialog, a second Escape takes it down, and
+            # exiting takes Enter or Space on YES. One keystroke no longer
+            # ends a round. The MENU's Exit tile is untouched -- two shots is
+            # already its confirmation.
+            #
+            # WHILE A MEASUREMENT OWNS THE SCREEN, Escape keeps its old
+            # immediate exit. Nothing may cover a screen the app is measuring
+            # (RULES B2), so the dialog would not be drawn -- and a dialog
+            # nobody can see is a dialog nobody can answer, which is the one
+            # way this feature could trap him. A measurement is also exactly
+            # when he most wants out.
+            board = self.scene.get("exit")
+            busy = bool(self.scene.calibrating
+                        or self.scene.diagnostics.get("measuring"))
+            if board is not None and not busy and not board.visible:
+                # The route out is handed over HERE, by the only thing that
+                # raises the dialog, so the layer can never quit on its own
+                # and there is still one definition of how this app closes.
+                board.on_exit = self.request_quit
+                board.ask()
+                self.scene.mark_dirty()
+                self.update()
+                return
+            self.request_quit()
             return
         if key in self.TOGGLES and self.scene.get(self.TOGGLES[key]) is not None:
             self.scene.toggle(self.TOGGLES[key])

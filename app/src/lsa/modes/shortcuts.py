@@ -95,10 +95,34 @@ BOX_PAD_X = 0.0045       # a key's box, either side of the glyph
 BOX_PAD_Y = 0.0006       # ... and above and below it
 # The box outline's width. 0.0014 (the mockup's .14cqw) measured 2.005% lit above
 # luminance 60 at 1080p against the 2% budget (test_modes section 46, 2026-10-23): the
-# budget is spent by each key's box stroke, its glyph and the title, because the prose is
-# under 60. This is the smallest lever -- a thinner outline, no row removed, the budget
-# untouched -- and it is a FRACTION OF THE SCREEN WIDTH (1.92 px at 1080p, 3.84 at 4K).
-BOX_STROKE = 0.0010
+# budget is spent by each key's box stroke, its glyph, the title AND EVERY ROW'S
+# DESCRIPTION. This is the smallest lever -- a thinner outline, no row removed, the
+# budget untouched -- and it is a FRACTION OF THE SCREEN WIDTH (1.73 px at 1080p,
+# 3.46 at 4K).
+#
+# THIS COMMENT USED TO SAY "because the prose is under 60", AND THAT WAS WRONG.
+# `GREY_TEXT` is `grey_at(0.80)` of a ceiling of 78, which is 62, and the budget
+# counts everything ABOVE 60 -- the suite has printed "prose luminance 62" the
+# whole time. So a row's description costs about 0.003 points per character, and
+# acting on the old sentence I lengthened three descriptions and put the screen
+# back over its margin at 1.983% within the hour. Measured 2026-11-09: 13 extra
+# characters cost 0.038 points.
+#
+# 0.0010 -> 0.0009 on 2026-11-09, when the two MAGAZINE rows took 1080p from
+# 1.716% to 1.964% and over the margin the suite holds. **THIS SCREEN IS NOW AT
+# ITS AREA CAPACITY AT 1080p** and that is a measurement, not a feeling:
+#
+#   the two rows cost          +0.248 points (nine bold glyphs and two boxes)
+#   stroke 0.0010 -> 0.0009     -0.019
+#   stroke 0.0010 -> 0.0008     -0.047   (1.34 px at 1080p: hairline)
+#   BOX_PAD_X 0.0045 -> 0.0026  -0.013   (all thirty boxes, and still worthless)
+#
+# So the stroke and the padding are spent levers, and what is left is the GLYPHS,
+# which are the approved mockup. 1080p is the binding case and not 4K (1.25%)
+# because a small bold glyph's stems snap to whole pixels and a 21pt glyph is
+# proportionally fatter than the 42pt one. **The next key row added to this
+# screen needs a shorter glyph or a design decision, not another nudge here.**
+BOX_STROKE = 0.0009
 BOX_RADIUS = 0.003
 TITLE_GAP = 0.012        # between the MENU button and the title
 
@@ -148,11 +172,22 @@ ALSO = (
     # when pressed anywhere else, rather than doing nothing (RULES C1).
     Entry("PgUp PgDn", "Target Speed - Faster / Slower",
           (int(Qt.Key_PageUp), int(Qt.Key_PageDown))),
-    Entry("Esc", "Exit the Game", (int(Qt.Key_Escape),)),
+    Entry("Esc", "Exit the Game (Asks)", (int(Qt.Key_Escape),)),
+)
+
+MAGAZINE = (
+    # 2026-11-09. Up / Down set the size and remember it; Right tops THIS round
+    # up by ten and remembers nothing. Two keys because they are two different
+    # things, and the rows say which: a key whose meaning depends on when it is
+    # pressed is the complaint already open against O and T.
+    Entry("Up Dn", "Magazine Size",
+          (int(Qt.Key_Up), int(Qt.Key_Down))),
+    Entry("Right", "Add 10 Rounds, This Round", (int(Qt.Key_Right),)),
 )
 
 HEAD_DRILLS = "DRILLS - PRESS AGAIN FOR A NEW ROUND"
 HEAD_PLAYERS = "PLAYERS - ON THE MENU"
+HEAD_MAGAZINE = "MAGAZINE"
 HEAD_CHECKS = "CHECKS"
 HEAD_ON_SCREEN = "ON SCREEN - PRESS TO SHOW OR HIDE"
 HEAD_ALSO = "ALSO"
@@ -179,8 +214,12 @@ def player_entries() -> "list[Entry]":
 
 def groups() -> "tuple[list, list]":
     """(left column, right column), each a list of (heading, [Entry])."""
+    # The magazine group sits in the LEFT column because that is where the room
+    # is: the right column already carries three groups, and the layout shrinks
+    # BOTH columns to fit the taller one.
     left = [(HEAD_DRILLS, drill_entries() + [NEW_ROUND]),
-            (HEAD_PLAYERS, player_entries())]
+            (HEAD_PLAYERS, player_entries()),
+            (HEAD_MAGAZINE, list(MAGAZINE))]
     right = [(HEAD_CHECKS, list(CHECKS)),
              (HEAD_ON_SCREEN, list(ON_SCREEN)),
              (HEAD_ALSO, list(ALSO))]
@@ -396,6 +435,18 @@ class Shortcuts(Mode):
     def paint(self, p: QPainter, ctx: RenderContext) -> None:
         if ctx.calibrating:
             return          # one ring to shoot at while the grid is shot
+        if ctx.asking:
+            # A QUESTION IS IN FRONT OF THIS SCREEN -- today the exit dialog,
+            # raised by Escape. Nobody reads a key list while answering "do you
+            # want to leave", and this is the brightest screen in the app: on
+            # its own it measures about 1.95% of the 2% lit-area budget at
+            # 1080p (RULES B1b -- 1.945% through test_modes section 46's
+            # harness, 1.983% through a real Scene in test_exit_confirm; the
+            # two differ a little and neither is the wrong one), so with a
+            # 0.427% dialog over it the pair breaks the rule at 2.379%.
+            # Measured 2026-11-09; `tests/test_exit_confirm.py` sweeps every
+            # screen and fails the build if any pair goes over.
+            return
         plan = self.plan(ctx)
         p.save()
         p.setBrush(Qt.NoBrush)

@@ -6,7 +6,9 @@
 
 A round of ScreenPlink is one magazine. The default is **seventeen**, because
 that is what a CZ Shadow holds, and the point of the whole design is to train the
-awareness of the magazine you are actually carrying.
+awareness of the magazine you are actually carrying. Set it to the magazine in
+your own pistol with the **Up and Down arrows** -- anything from 6 to 30, and the
+app remembers it.
 
 > *"This is not just the game. This is training, and people should understand the
 > exact size of their mag and the exact number of bullets they have left in that
@@ -43,9 +45,35 @@ round screen up.
 So the last hole is seen where it landed, against the target it struck, rather
 than being swept away by a results screen the instant it arrives.
 
-## Changing the size
+## Changing the size, from where you are standing
 
-The magazine is stored in `config\settings.local.json` as `magazine`, and may be
-anything from 1 to 50 -- beyond that the strip stops being readable at a glance.
-There is no on-screen control for it yet. A change takes effect at the start of
-the next round rather than ending the one you are shooting.
+**The Up and Down arrows change the magazine size, one round per press, from 6
+to 30.** It is saved the moment you press, so the gun you train with is the gun
+you get next time. You do not have to put the pistol down or find a config file.
+
+A change takes effect **at the start of the next round**, never in the middle of
+the one you are shooting. That is deliberate: a magazine that shrank under you
+would end a string you were halfway through. So if you press Up during a round,
+the bullets on screen stay as they are and the app tells you the new size is
+waiting for the next round.
+
+**The Right arrow adds ten rounds to the round you are shooting**, and saves
+nothing. Press it when a string is going well and you want to keep going, or
+when a drill has not had enough of you yet. It tops the magazine up to fifty at
+most, and the next round goes back to the size the arrows are set to. On the
+menu, or after a round has closed and its score is on screen, the app tells you
+there is no magazine to top up instead of quietly doing nothing.
+
+A full magazine is still one round, however it got that long: if you top up to
+forty, the round ends on the fortieth shot.
+
+**When the magazine outgrows the strip, the bullets stop shrinking and the strip
+draws as many as fit.** A row of fifty cartridges small enough to fit across the
+corner is not countable from the firing line, which defeats the whole purpose of
+drawing them. Every size you can set with the arrows fits in full; only the
+Right arrow can outgrow it. The numeral never truncates -- if it reads 44, there
+are 44 in the gun.
+
+The size also still lives in `config\settings.local.json` as `magazine`, where it
+may be anything from 1 to 50; a value outside that is pulled into range rather
+than refused.

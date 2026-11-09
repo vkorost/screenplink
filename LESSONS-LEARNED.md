@@ -434,6 +434,58 @@ aim deliberately at the back of the target, to reproduce the bug, also pushed
 the residual negative -- and the learner cannot tell "aimed low" from "clock is
 late". The first estimate was biased by the instruction given to produce it.
 
+## 23. A bound chosen against the obvious case is wrong for the family, and the
+## test that it fits must not be the arithmetic that made it fit
+
+A row of cartridges on screen says how many rounds are left in the magazine. It
+shrinks to fit the corner it is drawn in, which worked until the magazine became
+something the user could enlarge: fifty cartridges small enough to fit cannot be
+counted from where the shooter stands, which is the only reason the row exists.
+So the row needed a floor -- shrink this far and no further, then draw as many as
+fit and let the numeral carry the count. Two things went wrong with that floor,
+and both are general.
+
+**The floor was fitted to the wrong case.** It was derived against the
+single-player strip, which gets 46% of the screen's width, and set at 0.75 of
+nominal with what looked like margin. The binding case is a two-player HALF,
+which gets 90% of half the screen -- slightly narrower -- and needs 0.742. At
+0.75 every two-player round at the largest size would have drawn twenty-nine
+bullets of thirty, for ever, on both halves. **When a quantity is bounded across
+a family of cases, derive the bound from the worst member and let a test walk the
+whole family.** The test that caught it walks all twenty-five sizes, in single
+player and in both halves, at two screen sizes; it was written before the number
+was believed, and the same test with the floor raised shows the fault returning
+at a magazine of twenty-eight.
+
+**And the fit test was the expression that made it fit.** Having scaled the row
+by `cap / total` so that it exactly fills the space, the code then asked `is
+total > cap` to decide whether to drop a bullet. In floating point "exactly"
+lands a hair over about half the time, so a twenty-five-round magazine silently
+lost its last cartridge -- at one screen size and not the other, which is what
+makes this class of bug read as a mystery. The condition had to become the thing
+that was actually true: *was the shrink floored?* **A test of whether something
+fits must not be derived from the arithmetic that fitted it; ask about the
+decision you took, not about the number it produced.**
+
+**The same mistake, caught the same day, in a different place.** A confirmation
+dialog was added in front of the one key that closes the app. Measuring its
+brightness over *a* drill gave a comfortable figure. Measuring it over **every**
+screen the app can show found one that broke the rule: the key-list screen,
+which is the brightest thing in the program, plus the dialog, is 2.379% of a 2%
+budget. One line of test code -- a loop over the registry instead of a drill
+picked by hand -- is the difference between that and shipping it, and it also
+covers whatever screen somebody adds next year.
+
+**The screen's brightness budget is the third half of this story.** This app
+limits how much of the display may be lit while anyone is shooting, because the
+camera watching that display has to see a laser dot against it. Adding two rows
+to the key-list screen took it from 1.716% to 1.964% of a 2% budget, and the
+suite refused the build at a 1.95% margin bar. The temptation is to move the bar
+by fifteen thousandths and carry on. **The bar had just done its job, so the
+answer is to spend less or to decide differently -- never to move the bar**; the
+measurement also showed the two remaining levers were nearly spent, which is a
+fact the next person needs and which only exists because the bar held.
+
 ---
 
 ## The shortest version
@@ -452,3 +504,7 @@ late". The first estimate was biased by the instruction given to produce it.
 11. A timestamp from across a device boundary is late. Measure by how much.
 12. A value the program learns about itself: damp it, clamp it, and log every
     move. And check that the way you asked for the data did not shape it.
+13. Derive a bound from the worst case in the family, not the obvious one, and
+    never ask "does it fit" with the arithmetic that made it fit.
+14. When a budget's guard fires, spend less. Moving the bar is how a check comes
+    to mean nothing.

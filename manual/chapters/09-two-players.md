@@ -23,8 +23,10 @@ belongs to the right: one comparison, no dead zone, no argument.
 
 ## A round is one magazine each
 
-Each side has its own strip of seventeen and its own score. A side is finished
-when the app has seen and scored seventeen of its shots.
+Each side has its own strip of seventeen -- or whatever the Up and Down arrows
+have set the magazine to -- and its own score. A side is finished when the app
+has seen and scored that many of its shots. The Right arrow's ten extra rounds
+go to **both** halves, so the two sides are never dealt different magazines.
 
 That is a deliberate choice about fairness. If the app under-detects one
 shooter's pistol, that shooter simply pulls the trigger a few more times to reach

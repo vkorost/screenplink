@@ -5921,8 +5921,10 @@ def main() -> int:
 
     c4_46 = context(now=1.0)                                            # 3840 x 2160
     c1080_46 = type(c4_46)(now=1.0, dt=1 / 60.0, rect=QRect(0, 0, 1920, 1080), stats=SessionStats())
-    _HEADS46 = [_sc46.HEAD_DRILLS, _sc46.HEAD_PLAYERS, _sc46.HEAD_CHECKS,
-                _sc46.HEAD_ON_SCREEN, _sc46.HEAD_ALSO]
+    # The order is the drawing order: the left column top to bottom, then the
+    # right. MAGAZINE joined the left column 2026-11-09 with the arrow keys.
+    _HEADS46 = [_sc46.HEAD_DRILLS, _sc46.HEAD_PLAYERS, _sc46.HEAD_MAGAZINE,
+                _sc46.HEAD_CHECKS, _sc46.HEAD_ON_SCREEN, _sc46.HEAD_ALSO]
 
     class _Spy46(_QP46):
         """Records what is ACTUALLY drawn: the text, the font it was drawn in, the
@@ -6000,6 +6002,11 @@ def main() -> int:
           and sorted(without_x46) == sorted(rows46[_sc46.HEAD_DRILLS]))
     expect46 = {
         _sc46.HEAD_PLAYERS: [("O", "One Player"), ("T", "Two Players")],
+        # 2026-11-09, his request. Two rows because they are two different
+        # things: Up/Down save a size that governs the next round, Right deals
+        # ten rounds into the one being shot and saves nothing.
+        _sc46.HEAD_MAGAZINE: [("Up Dn", "Magazine Size"),
+                              ("Right", "Add 10 Rounds, This Round")],
         _sc46.HEAD_CHECKS: [("C", "Self-Calibrate"), ("A", "Self-Check"), ("Q", "Last Verdict"),
                             ("G", "Calibrate by Shooting"),
                             ("U", "Calibrate Brightness by Shooting"),
@@ -6013,9 +6020,9 @@ def main() -> int:
         # in requirements/help_screen_mockup_01.html, untouched.
         _sc46.HEAD_ALSO: [("E", "Erase the Holes"), ("+ -", "Volume Up / Down"),
                           ("PgUp PgDn", "Target Speed - Faster / Slower"),
-                          ("Esc", "Exit the Game")]}
+                          ("Esc", "Exit the Game (Asks)")]}
     check("the fixed rows are the ones the owner approved in requirements/help_screen_mockup_01.html: "
-          "the five headings in order, the title, and every wording",
+          "the headings in order, the title, and every wording",
           list(rows46) == _HEADS46 and all(rows46[h_] == v_ for h_, v_ in expect46.items())
           and any(t_[0] == "KEYBOARD SHORTCUTS" for t_ in spy46.texts), str(list(rows46)))
 
@@ -6064,11 +6071,15 @@ def main() -> int:
     # The named keys the scan can recognise. A key the screen advertises but
     # this table does not know reads as UNHANDLED even when it is handled
     # perfectly well, which is how a harness copy of the code goes stale
-    # (RULES C17). PgUp/PgDn joined it with the drill speed, 2026-11-07.
+    # (RULES C17). PgUp/PgDn joined it with the drill speed, 2026-11-07; the
+    # three arrows with the magazine keys, 2026-11-09.
     _TOK46 = {int(_Qt46.Key_Plus): "Qt.Key_Plus", int(_Qt46.Key_Minus): "Qt.Key_Minus",
               int(_Qt46.Key_Escape): "Qt.Key_Escape",
               int(_Qt46.Key_PageUp): "Qt.Key_PageUp",
-              int(_Qt46.Key_PageDown): "Qt.Key_PageDown"}
+              int(_Qt46.Key_PageDown): "Qt.Key_PageDown",
+              int(_Qt46.Key_Up): "Qt.Key_Up",
+              int(_Qt46.Key_Down): "Qt.Key_Down",
+              int(_Qt46.Key_Right): "Qt.Key_Right"}
 
     def _handled46(code, srcs):
         """Who handles this key code, or None."""
@@ -6129,9 +6140,24 @@ def main() -> int:
               f"(RULES B1b)", 0.0005 < lit46 <= 0.02, f"{lit46 * 100:.3f}%")
         # A MARGIN, not just the bar (2026-10-23): the screen sat at 2.005% at 1080p and was
         # one added row from failing, and a check sitting on its bar is a flake waiting to
-        # happen. 1.95% leaves room for the next row at ~0.03 points each.
+        # happen.
+        #
+        # THE "~0.03 POINTS A ROW" THIS NOTE USED TO ESTIMATE WAS WRONG BY FOUR TIMES.
+        # Measured 2026-11-09: the two MAGAZINE rows cost 0.248 points at 1080p together,
+        # because a row's cost is its GLYPH, and theirs are five characters where most are
+        # one. The bar held and did its job -- it caught the overrun at 1.964% -- and the
+        # answer was a thinner box stroke (0.0010 -> 0.0009, measured, -0.019), not a
+        # moved bar: the 2026-10-18 welcome-hold lesson is that nobody raising the bar is
+        # how a check sits red or borderline for four days.
+        #
+        # 1080p is the binding case; 4K measures about 1.25% for the same screen.
+        # THE MARGIN IS NOW ABOUT 0.005 POINTS, which is a twentieth of one wide row, and
+        # `modes/shortcuts.BOX_STROKE` carries the table of what the remaining levers buy
+        # (the stroke and the padding are both spent). A further row needs a shorter
+        # glyph or a design decision; this check is where that conversation starts.
         check(f"{label46}: lit area (>60) {lit46 * 100:.3f}% keeps a MARGIN under the budget (1.95%), "
-              f"so one more row does not break it", lit46 <= 0.0195, f"{lit46 * 100:.3f}%")
+              f"with the glyphs now costing ~0.12 points a wide row", lit46 <= 0.0195,
+              f"{lit46 * 100:.3f}%")
     stroke_ok46 = (len(spy46.boxes) == sum(1 for t_ in spy46.texts if t_[2] and t_[3] == _L46.GREY_HIT.red()
                                            and t_[0] in {e_.glyph for e_ in adv46})
                    and all(b_[2] and b_[1] > 0 for b_ in spy46.boxes))

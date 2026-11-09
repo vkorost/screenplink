@@ -161,7 +161,10 @@ def main() -> int:
           f"{lab.cmb_device.count()} devices")
     check("backends offered", lab.cmb_backend.count() > 0,
           ", ".join(lab.cmb_backend.itemText(i) for i in range(lab.cmb_backend.count())))
-    check("scene has every layer", len(lab.scene.layers) == 17,
+    # 18 since 2026-11-09, when Escape gained its YES/NO dialog ("exit"). This
+    # is a COUNT of the app's own layer table, so adding a layer and not saying
+    # so here fails the build -- which is the point (RULES C17).
+    check("scene has every layer", len(lab.scene.layers) == 18,
           ", ".join(la.name for la in lab.scene.layers))
     # Regression guard: recording and exposure buttons must be visibly dead
     # until a camera is streaming. They used to look pressable and then whisper

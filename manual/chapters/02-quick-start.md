@@ -37,10 +37,13 @@ the app working for a few shots and then stopping.
 appears. Shoot the square you want, click it, or press the key printed on it.
 
 **5. Shoot.** Every shot that registers draws a hole and plays a bang. You have
-seventeen rounds. When the magazine is empty the round ends and the screen shows
-what you did with it.
+seventeen rounds to start with; the **Up and Down arrows** set that to your own
+magazine, anything from 6 to 30, and the app remembers it. When the magazine is
+empty the round ends and the screen shows what you did with it.
 
-To leave, press **Escape**, or shoot the **Exit** tile twice.
+To leave, press **Escape** and answer YES: Escape puts up a YES/NO question,
+Enter or Space on YES closes the app, and a second Escape takes the question
+away again. Or shoot the **Exit** tile on the menu twice.
 
 ## Three things that look like faults and are not
 

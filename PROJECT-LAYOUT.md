@@ -49,9 +49,9 @@ test that imports it in a subprocess and fails if Qt appears.
 | **`director.py`**, **`routines.py`** | One run slot and the measurement routines that take it. Every hardware procedure (set an exposure, draw, wait, photograph, put it back) is a generator that yields what it is waiting for, so two of them can never interleave. |
 | **`selfcheck.py`** | Measurements in, verdict and actions out. Pure, so it is tested exhaustively. |
 
-### `app/tests/`: 56 files
+### `app/tests/`: 58 files
 
-Thirty-two suites plus six **mutation runners** and the helpers they share. No
+Thirty-four suites plus six **mutation runners** and the helpers they share. No
 suite needs a camera or a display. The mutation runners put known faults back
 into the code and fail the build unless the check written for each one goes red,
 a check that cannot fail is not a check, and this project has shipped several.

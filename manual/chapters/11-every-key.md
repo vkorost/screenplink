@@ -34,12 +34,35 @@ Pressing a drill's own key again starts a new round of it.
 | **O** | One player |
 | **T** | Two players |
 
+| Key | Magazine |
+|--------------------|----------------------------------------------------|
+| **Up** **Down** | Magazine size, bigger and smaller |
+| **Right** | Add 10 rounds to this round only |
+
+**The Up and Down arrows set your magazine size**, one round per press, from 6
+to 30. It is saved, so the gun you train with is the gun you get the next time
+you launch the app. A change takes effect at the start of the next round rather
+than ending the one you are shooting, so if you press Up mid-string the bullets
+on screen do not move and the app says which round the new size applies to.
+
+**The Right arrow adds ten rounds to the round you are shooting**, up to fifty,
+and saves nothing. It is for carrying on when a string is going well, or for
+finishing a drill you have not got the measure of yet; the next round is dealt
+the size you set with the arrows. Press it on the menu or on a closed round and
+the app says why there is no magazine to top up, rather than appearing to work.
+
+Past about thirty rounds the strip stops shrinking the bullets and draws as many
+as fit instead, because the point of it is to be countable from where you are
+standing. **The numeral always tells the truth**: if it says 44 you have 44,
+however many cartridges are drawn beside it.
+
 | Key | Checks |
 |-----------|-------------------------------------------------------------|
 | **C** | Self-calibrate |
 | **A** | Self-check |
 | **Q** | Show the last verdict |
 | **G** | Calibrate by shooting a grid |
+| **U** | Calibrate brightness by shooting |
 | **X** | Measure the exposure |
 | **F** | Measure the noise floor |
 
@@ -58,6 +81,25 @@ Pressing a drill's own key again starts a new round of it.
 | **+** **-** | Volume up and down |
 | **PgUp** **PgDn** | Target speed, faster and slower |
 | **Esc** | Exit the game |
+
+The arrows and Page Up and Page Down are the keys meant to be pressed while you
+are standing there with the pistol, so none of them repeats when held: one press
+is one round or one rung. Leaning on the Right arrow cannot run your magazine up
+to fifty by accident.
+
+**Escape asks before it closes the app.** It puts up a question with YES and NO,
+YES already chosen, and the app closes when you press **Enter** or **Space**.
+Press **Escape** again and the question goes away; choose NO with the right
+arrow or the **N** key and you are back in the round where you left it. The
+round keeps running behind the question, so answer it and carry on shooting.
+
+**F11 closes the app without asking.** That is deliberate: a confirmation is
+only safe if there is still one key that cannot be argued with.
+
+The question does not appear while the app is measuring its own screen -- during
+a calibration or a self-check, Escape closes the app at once, because nothing is
+allowed to cover a screen the camera is measuring. The **Exit** tile on the menu
+is unchanged and still takes two shots.
 
 **Page Up and Page Down change how fast the targets move**, and the app
 remembers the setting for each drill separately. Speed up Bouncing Balls and

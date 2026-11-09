@@ -74,6 +74,16 @@ echo === per-drill target speed (Page Up / Page Down, remembered per drill) ===
 if errorlevel 1 set FAILED=%FAILED% mode_speed
 echo.
 
+echo === the magazine from the firing line (Up / Down size, Right +10 rounds) ===
+".venv\Scripts\python.exe" "tests\test_magazine_keys.py"
+if errorlevel 1 set FAILED=%FAILED% magazine_keys
+echo.
+
+echo === Escape asks before it closes, and the app can still be closed ===
+".venv\Scripts\python.exe" "tests\test_exit_confirm.py"
+if errorlevel 1 set FAILED=%FAILED% exit_confirm
+echo.
+
 echo === auto-alignment (recovers a drifted mapping without any shots) ===
 ".venv\Scripts\python.exe" "tests\test_align.py"
 if errorlevel 1 set FAILED=%FAILED% align

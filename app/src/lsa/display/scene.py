@@ -97,6 +97,20 @@ class RenderContext:
     # test or by any other caller behaves exactly as it did before this field
     # existed, and only the live Scene is handed the measured value.
     shot_pipeline_lag_s: float = 0.0
+    # A QUESTION IS IN FRONT OF THE SCREEN and waiting for an answer: today
+    # that is the exit dialog (`layers.ExitConfirm`), raised by Escape. A layer
+    # whose content nobody is reading while they answer it may stand down, the
+    # same way furniture stands down for a measurement (RULES B2) -- and it is
+    # not only tidiness: the Keyboard Shortcuts screen is the brightest screen
+    # in the app, and about 1.95% of the 2% lit-area budget at 1080p plus a
+    # 0.427% dialog is 2.379%, over the rule (B1b, measured 2026-11-09).
+    #
+    # DERIVED per frame by `Scene._context` from whether that layer is visible,
+    # never stored: the dialog can be dismissed by its own key handler, which
+    # nothing else sees, so a copy of this would go stale the first time he
+    # pressed Escape twice. FALSE by default, so every context built by a test
+    # or any other caller behaves exactly as it did before this existed.
+    asking: bool = False
     calibrating: bool = False
     # A measured camera-to-screen mapping exists, so a shot can be drawn where
     # it actually landed. Layers that only make sense BEFORE that -- the
@@ -157,6 +171,14 @@ class Layer:
     visible: bool = True
     # Set by a layer whose content changes every frame regardless of events.
     animated: bool = False
+    # Set by a layer that holds a QUESTION open and is waiting to be answered
+    # (the exit dialog). It raises `RenderContext.asking` for every layer, so a
+    # screen nobody is reading while they answer can stand down. DECLARED here
+    # rather than reached for with a `getattr` default: that construct let
+    # `stats.last_shot_at` return 0.0 for days while a guard never fired
+    # (RULES C8), and a second dialog written later is covered by this without
+    # anybody remembering to add its name anywhere (E2).
+    asks_a_question: bool = False
 
     # A layer whose content a PERSON reads -- a number, a bar, a caption --
     # should not force a repaint faster than a person can read it. Set this to
@@ -372,4 +394,18 @@ class Scene:
             calibrated=self.calibrated,
             players=self.players,
             shot_pipeline_lag_s=self.shot_pipeline_lag_s,
+            asking=self._asking(),
         )
+
+    def _asking(self) -> bool:
+        """Is a layer holding a question open in front of the screen?
+
+        Read from the layer itself every frame rather than kept as a flag, for
+        the reason given beside `RenderContext.asking`: the exit dialog closes
+        itself on Escape and on NO, and a second copy of that fact would be
+        wrong from the first time it did.
+        """
+        for la in self._layers:
+            if la.visible and la.asks_a_question:
+                return True
+        return False

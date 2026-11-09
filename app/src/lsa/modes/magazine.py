@@ -31,6 +31,21 @@ Nothing that is left ever moves, so a glance finds the same bullets in the same
 place. The count is a numeral at the fixed outer end beside slot 0, because
 counting twelve outlines from several metres is slower than reading "12".
 
+WHEN THE MAGAZINE OUTGROWS THE STRIP (2026-11-09). The bullets shrink to fit,
+down to `MIN_SHRINK` of their height and no further; past that the strip draws
+as many as fit and the NUMERAL carries the count. `Geometry.capacity` is what
+the magazine holds and `len(slots)` is what is drawn, and `paint` clamps the two
+separately -- so the strip can under-draw and can never under-count. That floor
+is set so every size the keys can reach (`settings.MAGAZINE_KEY_MAX`) still
+shows every bullet; only the top-up key, which deals rounds past it for one
+round, can truncate the row.
+
+THE KEYS. Up and Down change the size and save it (`settings.magazine`, applied
+to the NEXT round, because a setting that shrank the round underneath the
+shooter would end it mid-string). The Right arrow deals ten more rounds into the
+round being shot and saves nothing (`ModeHost.add_rounds`). Both live in
+`tools/camera_lab._on_target_key`; the ranges live in `settings.py`.
+
 COST. Grey capped at luminance 60 by `artwork.ui` (spends none of the 2% lit-area
 budget, RULES B1b), red excess 0 (B1), sized as fractions of the screen height
 and fitted to the field's share of the width (`RenderContext.field_share`) --
@@ -58,6 +73,32 @@ EDGE_FRAC = 0.012            # of the screen height: clear of the screen edge
 # fit. A corner strip leaves the other half of the bottom for the key legend.
 SINGLE_MAX_W = 0.46
 HALF_MAX_W = 0.90
+# HOW SMALL A BULLET MAY GET before the strip stops shrinking and starts
+# showing fewer bullets instead. His instruction, 2026-11-09: "if there are too
+# many to fit into the display you will display only the bullets that fit the
+# screen". Shrinking without a floor is what the strip did before, and it is the
+# wrong trade for this one: the whole purpose of the strip is to be COUNTABLE
+# from the firing line ("people should understand the exact size of their mag"),
+# and 50 rounds shrank the cartridge to 46% of its height to achieve a row
+# nobody could count anyway. Past the floor the NUMERAL carries the count, which
+# it already did and which reads faster from several metres.
+#
+# 0.70 is DERIVED, not tuned: a magazine of MAGAZINE_KEY_MAX (30, the biggest
+# size the keys can set) needs the bullets no smaller than 0.742 of nominal to
+# fit, and the binding case is a TWO-PLAYER HALF (`HALF_MAX_W` of half the
+# screen, which is narrower than `SINGLE_MAX_W` of all of it), not the single
+# strip -- 0.75 looked right against the single strip and would have hidden one
+# bullet of thirty from each player. So the floor sits under that figure with
+# margin, and the strip is only ever truncated by the top-up key, never by a
+# size he set. `tests/test_magazine_keys.py` measures it over every size from
+# MAGAZINE_KEY_MIN to MAGAZINE_KEY_MAX, in single player and in both halves, at
+# two screen sizes -- raise this number past 0.742 and that goes red.
+#
+# A 16:9 screen, which is his and every screen this has been measured on. On a
+# taller panel the bullets are bigger for the same width and a full 30 may
+# truncate by one or two; that is the floor doing its job, and the numeral still
+# carries the count.
+MIN_SHRINK = 0.70
 
 
 @dataclass(frozen=True)
@@ -70,6 +111,17 @@ class Geometry:
     numeral: QRect
     bullet_h: int
     bullet_w: int
+    # How many rounds the magazine HOLDS, which is `len(slots)` on every size he
+    # can set and more than it when the top-up key has outgrown the screen. The
+    # two are separate fields on purpose: the numeral is clamped to the capacity
+    # and the bullets to the slots, so a truncated strip under-draws and never
+    # under-COUNTS.
+    capacity: int = 0
+
+    @property
+    def truncated(self) -> bool:
+        """The strip is showing fewer bullets than the magazine holds."""
+        return len(self.slots) < self.capacity
 
 
 def opposite_side(menu_corner: str) -> str:
@@ -88,7 +140,7 @@ def geometry(field: QRect, screen_h: int, n: int, *, share: float, side: str,
     "centre" (a block centred in the field, numeral at its left). `top` (the
     strip hangs from it) or `bottom` (the strip stands on it) places it.
     """
-    n = max(1, int(n))
+    n = capacity = max(1, int(n))
     bh = max(8, round(screen_h * BULLET_H_FRAC))
     aspect = _ui.aspect()
     bw = bh * aspect
@@ -97,11 +149,27 @@ def geometry(field: QRect, screen_h: int, n: int, *, share: float, side: str,
     total = n * pitch + num_w
     full_w = field.width() / share if share > 0 else field.width()
     cap = full_w * share * (SINGLE_MAX_W if side != "centre" else HALF_MAX_W)
-    if total > cap:                                  # shrink to fit, never overflow
-        k = cap / total
+    if total > cap:                     # shrink to fit, never overflow...
+        wanted = cap / total
+        k = max(MIN_SHRINK, wanted)
         bh = max(8, int(bh * k))
         bw, pitch, num_w = bw * k, pitch * k, num_w * k
         total = n * pitch + num_w
+        if wanted < MIN_SHRINK and pitch > 0.0:
+            # ...and once it is as small as a countable cartridge gets, draw
+            # only the bullets that fit. At least one, always: a strip of
+            # nothing but a numeral would hide the one thing the capacity
+            # cannot, which is whether the gun is loaded at all.
+            #
+            # THE CONDITION IS THE FLOOR, not a second width comparison. When
+            # the shrink is not floored, scaling by `cap / total` leaves the
+            # total EXACTLY at the cap, and in floating point "exactly" lands a
+            # hair over it about half the time -- which silently dropped the
+            # last bullet of a 25-round magazine, at one screen size and not
+            # the other. A geometry test that asks "does it fit" must not be
+            # the same expression that made it fit.
+            n = max(1, int((cap - num_w) // pitch))
+            total = n * pitch + num_w
     bw_i = max(1, int(round(bh * aspect)))
     edge = round(screen_h * EDGE_FRAC)
     if bottom is not None:
@@ -136,7 +204,8 @@ def geometry(field: QRect, screen_h: int, n: int, *, share: float, side: str,
         left = x0 + num_i + bw * GAP_FRAC
         for i in range(n):
             slots.append(QRect(int(round(left + i * pitch)), y, bw_i, bh))
-    return Geometry(QRect(x0, y, total_i, bh), tuple(slots), numeral, bh, bw_i)
+    return Geometry(QRect(x0, y, total_i, bh), tuple(slots), numeral, bh, bw_i,
+                    capacity)
 
 
 # -- drawing -------------------------------------------------------------------
@@ -166,9 +235,14 @@ def paint(p: QPainter, geo: Geometry, remaining: int, ctx, draw_lines) -> None:
     font's own metrics (B5), so no new measuring code lives here."""
     from ..display.layers import GREY_MID, px
 
-    remaining = max(0, min(int(remaining), len(geo.slots)))
+    # TWO CLAMPS, AND THEY ARE NOT THE SAME NUMBER. The count is clamped to what
+    # the magazine HOLDS and the bullets to the slots that fit, so a strip the
+    # top-up key has outgrown draws fewer cartridges while the numeral still
+    # says how many rounds are really left. Clamping both to `len(slots)` would
+    # make the strip lie about the gun, which is the one thing it is for.
+    remaining = max(0, min(int(remaining), max(geo.capacity, len(geo.slots))))
     pix = bullet_pixmap(geo.bullet_h)
-    for i in range(remaining):
+    for i in range(min(remaining, len(geo.slots))):
         p.drawPixmap(geo.slots[i].topLeft(), pix)
     p.setPen(GREY_MID)
     draw_lines(p, geo.numeral, [str(remaining)], px(ctx, 44), bold=True)

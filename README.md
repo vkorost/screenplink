@@ -60,8 +60,11 @@ Find me here: **[linktr.ee/vkorost](https://linktr.ee/vkorost)**
   clear the board, pop-up figures, a held figure, a figure that walks in and back
   out, and a soldier who takes hits and drops.
 - **Fifteen figures** with scoring rings printed on them, and a fall for each.
-- **A seventeen-round magazine.** Every shot spends a round, hit or miss. Fire on
-  empty and you get a click instead of a bang.
+- **A magazine, set to yours.** Seventeen by default; the up and down arrows set
+  it to anything from 6 to 30 and the app remembers it, so you train against the
+  gun you carry. Every shot spends a round, hit or miss, and firing on empty gets
+  you a click instead of a bang. The right arrow adds ten rounds to the string
+  you are shooting when you want to carry on.
 - **Two players on one screen**, left and right, scored separately, each with
   their own magazine and their own score. Play someone else, or take both halves
   yourself with a pistol in each hand and work your weak side. **Two lasers
@@ -146,7 +149,7 @@ app\.venv\Scripts\python.exe -m pip install -r app\requirements.txt
 app\scripts\Play.cmd
 ```
 
-Close the game with **Escape**. Never End Task because a force-killed app can leave the webcam needing a replug.
+Close the game with **Escape**, then Enter or Space on YES: it asks first, so a stray keystroke cannot end a string. Never End Task because a force-killed app can leave the webcam needing a replug.
 
 ---
 

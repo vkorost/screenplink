@@ -43,8 +43,13 @@ The **Exit** tile closes the app, and it is labelled Esc because Escape does the
 same thing. **It takes two hits.** The first arms it and the tile says so; the
 second closes the app, and the arming lapses after four seconds. A phantom
 detection closing the app in the middle of a string is the worst accident
-available here, which is why this one tile is the only thing in the app that asks
-twice.
+available here, which is why this tile asks twice.
+
+Escape asks in its own way: it puts up a YES/NO question with YES already
+chosen, and the app closes when you press Enter or Space. The tile's two hits
+and Escape's question are the same idea in the two languages this app speaks --
+one for the pistol, one for the keyboard. **The tile is unchanged**; nothing
+about shooting it has moved.
 
 ## Why the menu is not up while the app measures
 

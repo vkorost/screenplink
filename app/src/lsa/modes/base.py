@@ -1417,6 +1417,41 @@ class ModeHost(Layer):
         return self.magazine
 
     @property
+    def round_magazine(self) -> int:
+        """The size THIS round was dealt. `set_magazine` governs the next one, so
+        these two differ mid-round and the key that moved the setting has to be
+        able to say which it changed (RULES C1/C3: a key that appears to work and
+        silently does nothing is the fault, and the readout must name the number)."""
+        return self._round_mag
+
+    def add_rounds(self, n) -> "int | None":
+        """Deal `n` MORE rounds into the round being shot, and nothing else.
+
+        His request, 2026-11-09: "add bullets to the current mag to the current
+        session only, 10 at a time". So this moves `_round_mag` -- the size this
+        round was dealt -- and leaves `magazine`, the saved setting, exactly
+        where it was: the next round is dealt what the strip is set to, and
+        nothing reaches `settings.local.json`.
+
+        Returns the round's new size, or **None when there is no round to
+        extend**: the menu and the Keyboard Shortcuts screen spend no rounds,
+        and a round that has already closed has banked its score and been
+        judged, so re-opening it would change a result that is on screen. The
+        caller distinguishes the two by `counts_ammo` and says which (C3).
+
+        Growing `_round_mag` is enough on its own, by construction: `remaining`,
+        `_side_empty`, `_maybe_finish` and the strip's slot count all read it
+        live, so the bullets come back and the round simply has not ended yet.
+        It is also in `_signature`, so the screen repaints. A top-up DURING the
+        hold after the last shot therefore rescues the round rather than
+        reopening a closed one, which is the behaviour the hold exists for.
+        """
+        if self.round_over or not self.counts_ammo:
+            return None
+        self._round_mag = normalise_magazine(self._round_mag + max(0, int(n)))
+        return self._round_mag
+
+    @property
     def counts_ammo(self) -> bool:
         """Does the active screen spend rounds? A drill does; the menu is a
         screen, not a drill, and shooting a tile must not consume ammunition or

@@ -1685,7 +1685,9 @@ class KeyHelp(Layer):
         (("D", "dark"), ("W", "white"), ("R", "red"), ("Y", "grey"),
          ("J", "move pane"), ("[ ]", "size")),
         (("PgUp PgDn", "target speed (Escalating Ball, Bouncing Balls, Moving Target)"),),
-        (("Esc", "closes the app"), ("F11", "closes the app")),
+        (("Up Dn", "magazine size (remembered, next round)"),
+         ("Right", "+10 rounds into this round only")),
+        (("Esc", "exit (asks YES/NO first)"), ("F11", "exit at once")),
     )
 
     GAP = "   "            # between entries on a row
@@ -1924,6 +1926,206 @@ class VolumeReadout(Layer):
         x = ctx.rect.x() + (ctx.width - w) / 2
         y = ctx.rect.y() + ctx.height * 0.90
         p.drawText(QPointF(x, y), self.text)
+
+
+class ExitConfirm(Layer):
+    """"EXIT SCREENPLINK?" with YES and NO, in front of the one key that quits.
+
+    Asked for 2026-11-09, in these words: "pressing the Esc button brings up a
+    dialog with YES/NO buttons (yes being the default) asking if the user would
+    like to exit and second press of Esc removes that dialog; user would have to
+    press either Enter or Space bar key on YES to exit; or the user would select
+    NO and in this case he is back to the game; that mechanism doesn't change the
+    exit from Menu behavior from the menu page the user exists with two shots
+    into the exit tile".
+
+    Escape has closed the app outright since 2026-10-18, and the reasoning for
+    that is still in `window.keyPressEvent` and still correct -- what changes is
+    that one keystroke no longer ends a round. **The MENU's Exit tile is
+    untouched**: it already takes two shots, which is its own confirmation, and
+    it is a different act (shooting a target) from pressing a key by mistake.
+
+    WHO OWNS WHAT, because this layer must not be able to quit by itself. The
+    WINDOW owns Escape and the quit route (`TargetWindow.request_quit`), and
+    hands this layer that route at the moment it raises it. The layer decides
+    only the answer. A layer that could call for a shutdown from anywhere would
+    be a second definition of the one thing in this app that must have exactly
+    one (RULES E1), and the route itself is hard-won: hide at once, then emit on
+    the next turn of the event loop, never destroy a QObject inside its own
+    handler.
+
+    **IT CLAIMS ONLY THE KEYS IT ACTS ON, and F11 is not one of them.** The menu
+    once claimed the drill keys it could not act on and became a trap that only
+    F11 escaped; a modal dialog that swallowed everything would be that trap
+    with F11 swallowed too. So anything else falls through exactly as if the
+    dialog were not up, F11 still exits at once, and `Esc` always takes it down.
+
+    **Y AND N MOVE THE SELECTION; they do not answer.** His requirement is that
+    exiting takes Enter or Space -- "the user would HAVE TO press either Enter or
+    Space bar key on YES to exit" -- so there is exactly ONE way out of this
+    dialog, and Y, N, Left and Right all do the same kind of thing: point at an
+    answer. One exit path is also the only version of this that is simple to
+    explain while holding a pistol.
+
+    WHAT IT DRAWS, and why it is text and not a panel. The camera is watching
+    this screen and the round underneath is still running, so shooting is still
+    possible and RULES B1b applies: no filled panel, neutral grey at red excess
+    exactly 0 (B1), nothing above the artwork ceiling (B10), every size a
+    fraction of the screen and every string measured with the font's own metrics
+    (B5). The prose and the unselected answer sit under luminance 60 and cost
+    nothing; the title, the selected answer and its outline are the whole cost,
+    MEASURED by `tests/test_exit_confirm.py` rather than argued. The targets
+    show through it, which is right: the round has not stopped.
+
+    It does not paint while the app is measuring its own screen (B2). The window
+    will not raise it then either -- Escape keeps its old immediate exit while a
+    measurement owns the screen, because a dialog that cannot be drawn is a
+    dialog nobody can answer, and a measurement is exactly when he wants out.
+    """
+
+    name = "exit"
+    # Above the transient readout (72) and the verdict (68), below the flash
+    # cover (80) and the probe dot (90): nothing may occlude a measurement.
+    z = 74
+    visible = False
+    animated = False
+    # This layer holds a question open, so `RenderContext.asking` is true while
+    # it is up and a screen nobody is reading may stand down. The Keyboard
+    # Shortcuts screen does, and that is not tidiness: it is about 1.95% of the
+    # 2% lit-area budget at 1080p on its own, and this dialog is another
+    # 0.427%, which breaks the rule at 2.379%.
+    asks_a_question = True
+
+    TITLE = "EXIT SCREENPLINK?"
+    YES = "YES"
+    NO = "NO"
+    HINT = "ENTER OR SPACE TO CONFIRM      LEFT / RIGHT OR Y / N TO CHOOSE      ESC GOES BACK"
+
+    # Sizes picked at 1080p and scaled by `px` (B5). The hint is small on
+    # purpose: it is read once and then never again.
+    TITLE_AT_1080 = 40
+    ANSWER_AT_1080 = 30
+    HINT_AT_1080 = 14
+    GAP_FRAC = 0.030            # of the screen height, between the three rows
+    ANSWER_GAP_FRAC = 0.055     # of the screen width, between YES and NO
+    BOX_PAD_FRAC = 0.006        # of the screen width, around the chosen answer
+    BOX_STROKE_FRAC = 0.0009    # as on the Keyboard Shortcuts screen
+    BOX_RADIUS_FRAC = 0.003
+
+    SELECT_KEYS_YES = (Qt.Key_Left, Qt.Key_Y)
+    SELECT_KEYS_NO = (Qt.Key_Right, Qt.Key_N)
+    ACTIVATE_KEYS = (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space)
+
+    def __init__(self) -> None:
+        self.visible = False
+        # YES is the default, his instruction. Reset by `ask` on every raise, so
+        # a dialog dismissed on NO does not come back up pointing at NO.
+        self.yes = True
+        # The route out, handed over by whoever raises this. None means this
+        # dialog cannot quit, and then it will not claim the activate keys
+        # either: a YES that silently does nothing is RULES C1, and this is the
+        # one place in the app where that would read as "it would not close".
+        self.on_exit = None
+        self.answered = ""           # "", "exit" or "stay"; for the log and tests
+
+    # -- the state ------------------------------------------------------------
+
+    def ask(self) -> None:
+        """Raise it, pointing at YES."""
+        self.visible = True
+        self.yes = True
+        self.answered = ""
+
+    def dismiss(self) -> None:
+        """Take it down and leave everything else alone."""
+        self.visible = False
+        self.answered = "stay"
+
+    def on_key(self, key: int) -> bool:
+        if not self.visible:
+            return False         # the scene offers keys to visible layers only
+        if key == Qt.Key_Escape:
+            self.dismiss()
+            return True
+        if key in self.SELECT_KEYS_YES:
+            self.yes = True
+            return True
+        if key in self.SELECT_KEYS_NO:
+            self.yes = False
+            return True
+        if key in self.ACTIVATE_KEYS:
+            if not self.yes:
+                self.dismiss()
+                return True
+            if self.on_exit is None:
+                return False     # cannot act, so does not claim it (C1)
+            self.answered = "exit"
+            self.visible = False
+            self.on_exit()
+            return True
+        return False             # everything else falls through, F11 included
+
+    # -- drawing --------------------------------------------------------------
+
+    def layout(self, ctx: RenderContext) -> "dict[str, QRectF]":
+        """Where the three rows go, measured with the real font metrics so what
+        is checked is what is drawn (B5). Pure, so a test can ask it the same
+        question the painter does."""
+        f_title = mono(px(ctx, self.TITLE_AT_1080), bold=True)
+        f_ans = mono(px(ctx, self.ANSWER_AT_1080), bold=True)
+        f_hint = mono(px(ctx, self.HINT_AT_1080))
+        m_title, m_ans, m_hint = (QFontMetricsF(f_title), QFontMetricsF(f_ans),
+                                  QFontMetricsF(f_hint))
+        gap = ctx.height * self.GAP_FRAC
+        ans_gap = ctx.width * self.ANSWER_GAP_FRAC
+        pad = ctx.width * self.BOX_PAD_FRAC
+
+        w_yes = m_ans.horizontalAdvance(self.YES)
+        w_no = m_ans.horizontalAdvance(self.NO)
+        row_w = w_yes + ans_gap + w_no
+        cx = ctx.rect.x() + ctx.width / 2.0
+        cy = ctx.rect.y() + ctx.height / 2.0
+
+        title = QRectF(cx - m_title.horizontalAdvance(self.TITLE) / 2.0,
+                       cy - gap - m_title.height(),
+                       m_title.horizontalAdvance(self.TITLE), m_title.height())
+        yes = QRectF(cx - row_w / 2.0, cy, w_yes, m_ans.height())
+        no = QRectF(cx - row_w / 2.0 + w_yes + ans_gap, cy, w_no, m_ans.height())
+        hint = QRectF(cx - m_hint.horizontalAdvance(self.HINT) / 2.0,
+                      cy + m_ans.height() + gap,
+                      m_hint.horizontalAdvance(self.HINT), m_hint.height())
+        chosen = (yes if self.yes else no).adjusted(-pad, -pad / 2.0, pad, pad / 2.0)
+        return {"title": title, "yes": yes, "no": no, "hint": hint, "box": chosen}
+
+    def paint(self, p: QPainter, ctx: RenderContext) -> None:
+        if not self.visible or ctx.calibrating or ctx.diagnostics.get("measuring"):
+            return
+        box = self.layout(ctx)
+        p.setBrush(Qt.NoBrush)
+
+        # The chosen answer is named by an OUTLINE and by being the brightest
+        # thing here, never by colour: the detector scores red excess and a
+        # highlight with a hue in it is a highlight that fires the gunshot.
+        stroke = max(1.0, ctx.width * self.BOX_STROKE_FRAC)
+        radius = ctx.width * self.BOX_RADIUS_FRAC
+        half = stroke / 2.0
+        p.setRenderHint(QPainter.Antialiasing, True)
+        p.setPen(QPen(GREY_HIT, stroke))
+        p.drawRoundedRect(box["box"].adjusted(half, half, -half, -half), radius, radius)
+
+        p.setFont(mono(px(ctx, self.TITLE_AT_1080), bold=True))
+        p.setPen(QPen(GREY_HI))
+        p.drawText(box["title"], Qt.AlignCenter, self.TITLE)
+
+        p.setFont(mono(px(ctx, self.ANSWER_AT_1080), bold=True))
+        for name, text in (("yes", self.YES), ("no", self.NO)):
+            picked = (name == "yes") == self.yes
+            p.setPen(QPen(GREY_HIT if picked else GREY_MID))
+            p.drawText(box[name], Qt.AlignCenter, text)
+
+        p.setFont(mono(px(ctx, self.HINT_AT_1080)))
+        p.setPen(QPen(GREY_TEXT))
+        p.drawText(box["hint"], Qt.AlignCenter, self.HINT)
 
 
 def _wrap(text: str, width: int) -> list[str]:

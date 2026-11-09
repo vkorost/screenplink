@@ -238,6 +238,67 @@ this order:
 
 ---
 
+## Escape does not close the app any more
+
+By design, since 2026-11-09: **Escape asks first.** It raises a YES/NO question
+with YES already chosen, and the app closes on **Enter** or **Space**. A second
+Escape takes the question away, and NO (right arrow, or the `N` key) goes back to
+the round, which has been running behind it the whole time.
+
+- **`F11` still closes the app at once, with no question**, deliberately: a
+  confirmation is only safe while one key cannot be argued with. If the dialog
+  is ever in the way, that is the way out.
+- **The MENU's Exit tile is untouched** -- two shots, the first arming it.
+- **While a measurement owns the screen, Escape keeps its old immediate exit.**
+  Nothing may cover a screen the app is measuring (RULES B2), so the dialog
+  would not be drawn, and a dialog nobody can see is a dialog nobody can answer.
+- **The Keyboard Shortcuts screen (`K`) goes blank while the question is up.**
+  Also by design: it is the brightest screen in the app, and the two together
+  measure 2.379% of a 2% lit-area budget. `tests/test_exit_confirm.py` sweeps
+  every screen and fails the build if any pair goes over.
+- `Y` and `N` move the choice; they do not answer. Exiting always takes Enter or
+  Space, so there is exactly one way out.
+
+## The bullet strip shows fewer rounds than the magazine holds
+
+Working as designed, since 2026-11-09, and the numeral is the thing to read.
+
+The strip shrinks the cartridges to fit the corner it is drawn in, but only down
+to `modes/magazine.MIN_SHRINK` of their height. Past that it draws as many
+bullets as fit and stops, because a row of fifty cartridges small enough to fit
+across the corner cannot be counted from the firing line, which is the only
+reason the row exists.
+
+- **`Geometry.capacity` is what the magazine holds; `len(slots)` is what is
+  drawn.** `magazine.paint` clamps the count to the first and the bullets to the
+  second, so the strip can under-draw and can never under-count. If the numeral
+  reads 44 there are 44 rounds in the gun.
+- **Every size the arrow keys can set fits in full** (6 to 30,
+  `settings.MAGAZINE_KEY_MIN`/`MAX`). Only the Right arrow's ten-round top-up
+  can outgrow the strip, and only for the round being shot.
+- **Two players truncate sooner than one**, because a half is narrower than the
+  whole screen (`HALF_MAX_W` of half the width against `SINGLE_MAX_W` of all of
+  it). That is the case the floor is fitted to.
+- `tests/test_magazine_keys.py` section C measures it over every size at two
+  screen sizes, single and both halves.
+
+## The magazine keys do not seem to do anything
+
+Three different causes, and the app names each one in the log and in the
+on-screen readout rather than leaving you to guess.
+
+- **Up or Down during a round.** The new size governs the NEXT round, on
+  purpose: a magazine that shrank mid-string would end a string you were
+  halfway through. The readout says `MAGAZINE n  (NEXT ROUND)` and the log says
+  which round was dealt what. Use the Right arrow to lengthen the round you are
+  in.
+- **The Right arrow on the menu, or on a closed round.** Neither has a magazine
+  to top up -- the menu spends no rounds, and a closed round has banked its
+  score. The log says which of the two it is.
+- **A held key.** None of the arrows repeats, deliberately: one press is one
+  round. Ten rounds per repeat would put the magazine at its ceiling from one
+  lean on the keyboard.
+
 ## Shots on a MOVING target score, but only on its leading edge
 
 The symptom is specific and worth recognising: clean hits on the side the

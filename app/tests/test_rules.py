@@ -1229,6 +1229,7 @@ REGISTRY: dict[str, str] = {
     "C15": "test_coldstart (uses HIS calibrate/settle seconds, not shorter)",
     "C16": "test_rules L (no write_text in save; interrupted save, file intact)",
     "C17": "test_rules M (anchors match once) + test_feedback (stub methods read from the app source) + test_coldstart (the launch budget carries its derivation)",
+    "C18": "test_rules O (the learner damps, clamps and reports before it saves) + test_modes 15a2 (a late timestamp still scores)",
     # D -- how to work with him
     "D1": "judgement (look at the screen yourself; screenshot.ps1)",
     "D2": "tools/pre-commit + test_rules N (installed hook == repo copy)",
@@ -2541,6 +2542,65 @@ def _report_not_run() -> None:
     for _n in NOT_RUN:
         print("  - " + _n)
 
+
+section("O. a learned value is damped, clamped, and reported before it is saved")
+
+# C18, 2026-11-08. The pipeline-lag learner changed what the app SCORES, moved
+# 60ms -> 118ms in one session with nothing in the log, and oscillated because
+# it took the whole correction each time. These are the four properties that
+# stopped that, asserted against the real code rather than against a comment.
+import inspect as _o_inspect
+from lsa.tools.camera_lab import CameraLab as _OLab
+from lsa.settings import (normalise_pipeline_lag as _o_norm,
+                          PIPELINE_LAG_MAX as _O_MAX,
+                          PIPELINE_LAG_MIN as _O_MIN,
+                          PIPELINE_LAG_DEFAULT as _O_DEF)
+from lsa.modes.base import Mode as _OMode
+
+_o_src = _o_inspect.getsource(_OLab._note_aim_residual)
+
+check(0.0 < _OLab.LAG_STEP < 1.0,
+      "O1. DAMPED: the learner takes a fraction of each correction, never all "
+      "of it (a full step rings instead of converging)",
+      f"LAG_STEP = {_OLab.LAG_STEP}")
+
+check("self.LAG_STEP * resid" in _o_src,
+      "O2. ...and the damping is actually applied to the residual, not merely "
+      "declared", _o_src[:0] or "LAG_STEP not multiplied into the update")
+
+check("normalise_pipeline_lag(" in _o_src,
+      "O3. CLAMPED: the new value goes through the normaliser, so no sequence "
+      "of shots can drive it out of range")
+
+check(_o_norm(99.0) == _O_MAX and _o_norm(-1.0) == _O_MIN
+      and _o_norm("junk") == _O_DEF,
+      "O4. ...and that normaliser really clamps, both ends, and survives junk",
+      f"{_o_norm(99.0)} / {_o_norm(-1.0)} / {_o_norm('junk')}")
+
+check(_O_MAX < _OMode.MAX_REWIND_S,
+      "O5. TWO INDEPENDENT BOUNDS: the lag's own ceiling sits under the hit "
+      "test's rewind ceiling, so both must fail together to matter",
+      f"{_O_MAX} vs {_OMode.MAX_REWIND_S}")
+
+_o_log = _o_src.find("self._log(")
+_o_save = _o_src.find("self._save_settings()")
+check(_o_log != -1 and _o_save != -1 and _o_log < _o_save,
+      "O6. REPORTED BEFORE SAVED: the save can fail, and when it did the "
+      "report was written after it and was lost with it",
+      f"log at {_o_log}, save at {_o_save}")
+
+check("_lag_samples_needed()" in _o_src,
+      "O7. A REAL SAMPLE first: the move rests on a measured number of "
+      "qualifying shots, not on whatever has arrived")
+
+check("got[n // 2]" in _o_src or "median" in _o_src.lower(),
+      "O8. MEDIAN, not mean: one shot at the far wall must not move it")
+
+# The clamp warning must test the DAMPED figure. Comparing the undamped one
+# fired CLAMPED on every single update, which trains a reader to ignore it.
+check("abs((was + self.LAG_STEP * resid) - now)" in _o_src,
+      "O9. the CLAMPED warning compares what was actually applied, so it is "
+      "not always-on")
 
 print(f"\n{'=' * 64}")
 if FAILED:

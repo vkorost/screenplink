@@ -238,6 +238,68 @@ this order:
 
 ---
 
+## Shots on a MOVING target score, but only on its leading edge
+
+The symptom is specific and worth recognising: clean hits on the side the
+target is moving *away from* do not register, while hits in front of it do, and
+it gets worse the faster the target goes.
+
+That is a clock error, not a geometry one. A shot's timestamp is taken when the
+camera frame reaches the program, and the display pipeline and the camera's own
+pipeline both happened before that, to a target the shooter had already aimed
+at. The hit test rewinds a moving target to where it was when the shot was
+taken, and unless it also allows for those two delays the tested centre sits
+ahead of the one on the glass.
+
+- **`pipeline_lag_s` in `config\settings.local.json`** is that allowance, in
+  seconds. It is measured on this machine from ordinary shooting and saved; it
+  is not a preference to tune by hand, though setting it is harmless because
+  it is clamped and re-learned.
+- **The log reports every change**, with the sample it rested on:
+  `shot timing: over N shots at moving targets the median landed +Xms behind
+  the centre the hit test used, so the pipeline lag moves AAms -> BBms`.
+- **The self test reports the independent figure** it measures with no shooter
+  involved: `paint-to-detection latency over N dots: min ...`. Read the
+  **minimum**; waiting for the next camera frame can only add to it.
+- If the two disagree wildly, trust the shooting figure. The dot probe measures
+  a different path.
+
+A sanity check that costs nothing: a mapping error moves shots sideways as well
+as along the direction of travel. If the cross-track error is centred on zero
+and only the along-track error is biased, the mapping is fine and the clock is
+not.
+
+---
+
+## It says the camera is not delivering its own test dot
+
+The app paints a full-red dot and measures what the camera makes of it. On a
+healthy launch that reads 25 to 97. Below the line it says so -- and since
+2026-11-08 what it says depends on whether it has seen it **once or twice**.
+
+- **Once** is DEGRADED: *"the app's own test dot read faint. Measure it
+  again."* It names the evidence from the same launch that disagrees (frame
+  rate, and the mapping error if there is a mapping), and asks for **X** to
+  re-measure the exposure and **C** to re-run the check.
+- **Twice in one session** is BLOCKED, with the original advice: stop, close
+  the app by its window, unplug the camera and plug it back in.
+
+The split exists because a single faint reading proved transient: a dot read 10
+and the launch was blocked, and four minutes later the identical exposure read
+111 with nothing changed but time. Note also that **this dot is not your
+laser**: a screen emits it, while a laser reflects off the panel far more
+brightly, so shots can register perfectly well while this dot reads faint. That
+is the usual explanation when the app calls the camera dead and the holes keep
+appearing.
+
+Ambient light is the other common cause. Light falling on a matte panel lifts
+all three colour channels, and the detector scores red minus the larger of
+green and blue -- so a lit room collapses the dot's score without raising the
+noise floor. Check `verdict_camera.png`: if the room is visible, that is the
+answer.
+
+---
+
 ## The app will not start
 
 - **A second instance.** Two processes on one camera leaves the driver in a bad

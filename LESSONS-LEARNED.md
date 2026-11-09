@@ -356,6 +356,84 @@ threshold, on opposite halves of the screen.
 Date every claim about state, and strike the line out when it stops being true.
 Prose cannot be grepped, and nobody reliably re-reads their own prose.
 
+## 21. A timestamp is younger than the moment it describes
+
+A drill put a ball on the screen and scored shots against it. Shots that
+visibly struck the back of the ball did not register; shots in front of it did.
+The hit test was not wrong about geometry. It was wrong about time.
+
+The hit test already rewound the target to where it had been when the shot was
+taken, using `now - shot.t`. But `shot.t` was stamped when the camera frame
+*arrived in the program*, and two delays sit in front of that moment: the
+display pipeline that put the image on the glass, and the camera's own
+exposure, encoding, transfer and decoding. The target the operator aimed at was
+on the glass before either had finished, so the rewind fell short and the
+tested centre sat ahead of the visible one. A shot on the trailing edge lands
+`radius + lag x speed` from that centre and misses however cleanly it hit,
+while a leading-edge shot still scores. That asymmetry is the signature, and it
+is what made the fault intermittent and hard to describe.
+
+Measured rather than reasoned about: decomposing each shot along the target's
+own heading gave a median of 46 px behind the tested centre at 680 px/s, which
+is 67 ms. The cross-track median was 2.5 px, and that is the number that
+settles it -- sideways the shots were centred, so this was a clock error and
+not a mapping error. Two independent methods then agreed: a paint-to-detection
+probe measured 95 ms with no human in the loop, and bracketing live shots at
+two different settings put the zero crossing at 107 ms.
+
+**Every timestamp that crosses a device boundary is late by the pipeline behind
+it. If you compare it against a moving thing, measure that lateness instead of
+assuming it is zero, and decompose the error along the direction of motion --
+a radial distance hides which way it points.**
+
+The test that let this through is as instructive as the bug. It constructed a
+shot, handed itself the true moment it happened, and checked that the
+subtraction was correct. That is arithmetic. The one quantity that was wrong in
+the real world was supplied to the test as a given, so it could not fail at any
+latency. A test now feeds a deliberately late timestamp and requires the shot
+the operator actually aimed at to score.
+
+## 22. A value the program learns must be damped, clamped, and say so out loud
+
+The fix above needs a number that differs per machine, so the program measures
+it from ordinary use: every shot at a moving target yields a residual, and
+folding those in converges on the right value for this display and this camera.
+That is the correct design, and the first version of it was wrong in three
+separate ways, each of which is a general trap.
+
+**It took the whole correction every time, so it oscillated.** A magazine's
+median carries real noise; applying all of it overshoots, the next sample
+overshoots back, and the value hunts for ever instead of settling. Simulation
+against the observed noise predicted +-22 ms of wander, which is exactly what
+the live sessions showed. Taking a fraction of each correction, over a larger
+sample, halved it. **A feedback loop that applies its full error term does not
+converge, it rings.**
+
+**It changed what the program scored and said nothing.** The save that was
+meant to record it was called wrongly and raised; the report was written after
+the save, so the failure swallowed its own evidence; and the surrounding guard
+reported the exception once and suppressed the rest. The value moved from 60 ms
+to 118 ms, altering every subsequent hit test, with nothing in the log. **Emit
+the report before the write that might fail, and treat a learned value that
+moves silently as the same class of fault as a silent catch.**
+
+**Its own warning cried wolf.** A "clamped" note compared against the undamped
+figure, so it fired on every single update including the ones that clamped
+nothing -- which trains a reader to ignore the message that matters.
+
+The shape that survived: take only samples that qualify (the shot must
+plausibly have been aimed at the target, in units of the target rather than
+pixels); reduce by median, never mean; require a real sample before moving;
+apply a fraction of the correction; clamp to a range the quantity can
+physically occupy; and report every move with its sample count. The clamp is
+not paranoia -- without it, a user's habitual aiming bias is indistinguishable
+from latency and gets learned as if it were.
+
+**And beware of contaminating your own measurement.** Asking the operator to
+aim deliberately at the back of the target, to reproduce the bug, also pushed
+the residual negative -- and the learner cannot tell "aimed low" from "clock is
+late". The first estimate was biased by the instruction given to produce it.
+
 ---
 
 ## The shortest version
@@ -371,3 +449,6 @@ Prose cannot be grepped, and nobody reliably re-reads their own prose.
 8. Anything that draws on a screen you are measuring is a suspect.
 9. Put cleanup in a `finally`, never in whatever runs next.
 10. Expose measurements. A conclusion is only ever as good as the number under it.
+11. A timestamp from across a device boundary is late. Measure by how much.
+12. A value the program learns about itself: damp it, clamp it, and log every
+    move. And check that the way you asked for the data did not shape it.
